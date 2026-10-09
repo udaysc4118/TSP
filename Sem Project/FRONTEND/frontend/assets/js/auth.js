@@ -479,3 +479,31 @@ if (resendResetOtp) {
         }
     };
 }
+
+// Enter Key Listeners for smooth UX across forms
+function bindEnterKey(inputId, buttonId) {
+    const input = document.getElementById(inputId);
+    const btn = document.getElementById(buttonId);
+    if (input && btn) {
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                btn.click();
+            }
+        });
+    }
+}
+
+bindEnterKey("li_email", "submitLogin");
+bindEnterKey("li_pass", "submitLogin");
+bindEnterKey("su_name", "startSignupBtn");
+bindEnterKey("su_email", "startSignupBtn");
+bindEnterKey("su_pass", "startSignupBtn");
+bindEnterKey("su_otp", "verifyOtpBtn");
+bindEnterKey("fp_email", "submitForgotPass");
+bindEnterKey("rp_otp", "submitResetPass");
+bindEnterKey("rp_newpass", "submitResetPass");
+bindEnterKey("rp_confirmpass", "submitResetPass");
+bindEnterKey("admin_email", "submitAdminLogin");
+bindEnterKey("admin_pass", "submitAdminLogin");
+

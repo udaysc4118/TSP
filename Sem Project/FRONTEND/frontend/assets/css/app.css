@@ -282,10 +282,18 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
 .workspace-map {
     flex: 1;
     position: relative;
-    background: #030508;
+    background: linear-gradient(180deg, #eef2f7 0%, #dfe7f1 100%);
 }
-#map { width: 100%; height: 100%; z-index: 1; }
-.leaflet-container { background: #050810; font-family: 'Inter', sans-serif; }
+#map {
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    background: #e8eef5;
+}
+.leaflet-container {
+    background: #e8eef5;
+    font-family: 'Inter', sans-serif;
+}
 
 /* ── Analytics Cards ── */
 .analytics-card {

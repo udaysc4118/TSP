@@ -32,8 +32,11 @@ if (logoutBtn) {
 let map;
 document.addEventListener('DOMContentLoaded', function() {
     try {
-        map = L.map('map', { center: [19.5,75.5], zoom:7, zoomControl: false, attributionControl: false });
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { subdomains:'abcd', maxZoom:19 }).addTo(map);
+        map = L.map('map', { center: [19.5,75.5], zoom:7, zoomControl: false, attributionControl: true });
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            attribution: '&copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012'
+        }).addTo(map);
         L.control.zoom({ position: 'topright' }).addTo(map); // Moved back to right side since right panel is gone!
         setTimeout(() => map.invalidateSize(), 300);
         addCity(); addCity();

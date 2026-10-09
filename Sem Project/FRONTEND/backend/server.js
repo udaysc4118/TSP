@@ -21,13 +21,15 @@ app.use(cors());
 app.use(express.json());
 
 let initPromise = null;
+let backendMode = 'initializing';
 
 // Health check (no auth) to verify backend is up
 app.get('/api/health', (req, res) => {
     res.json({
         ok: true,
         time: new Date().toISOString(),
-        port: process.env.PORT || 5000
+        port: process.env.PORT || 5000,
+        backendMode
     });
 });
 
@@ -70,7 +72,7 @@ function readLocalDb() {
                 {
                     id: "admin-uuid-1",
                     admin_id: "admin@maharoute.ai",
-                    password_hash: "$2b$10$U6Uj1G8F/f3xN2j791mGvea1Kk5tP34U67/wQn6zTz/z6wS1Q11qG" // Password: admin123
+                    password_hash: "$2b$10$LGgL8b4TGBx.3EcZ.01x4Ov8jTka62Pkc6w5KKU29jgiWtKHnJP8C" // Password: admin123
                 }
             ],
             messages: []
@@ -116,12 +118,21 @@ function createLocalSupabaseMock() {
                     this._eq.push({ col, val });
                     return this;
                 },
+                ilike: function(col, val) {
+                    this._eq.push({ col, val, isIlike: true });
+                    return this;
+                },
                 gte: function(col, val) {
                     this._gte.push({ col, val });
                     return this;
                 },
                 single: function() {
                     this._single = true;
+                    return this;
+                },
+                maybeSingle: function() {
+                    this._single = true;
+                    this._maybeSingle = true;
                     return this;
                 },
                 order: function(col, opts) {
@@ -154,7 +165,11 @@ function createLocalSupabaseMock() {
                     if (this._op === 'select') {
                         let result = [...data];
                         this._eq.forEach(filter => {
-                            result = result.filter(item => String(item[filter.col]) === String(filter.val));
+                            if (filter.isIlike) {
+                                result = result.filter(item => String(item[filter.col] || '').toLowerCase() === String(filter.val || '').toLowerCase());
+                            } else {
+                                result = result.filter(item => String(item[filter.col]) === String(filter.val));
+                            }
                         });
                         this._gte.forEach(filter => {
                             result = result.filter(item => new Date(item[filter.col]) >= new Date(filter.val));
@@ -380,13 +395,14 @@ app.post('/api/auth/signup-request', async (req, res) => {
     try {
         const { name, email, password } = req.body;
         if (!name || !email || !password) return res.status(400).json({ error: 'All fields are required' });
+        const normalizedEmail = String(email).trim().toLowerCase();
 
         // Block if email exists in public.users
         const { data: existingUser } = await supabase
             .from('users')
             .select('id')
-            .eq('email', email)
-            .single();
+            .ilike('email', normalizedEmail)
+            .maybeSingle();
 
         if (existingUser) return res.status(400).json({ error: 'Email already registered' });
 
@@ -396,14 +412,14 @@ app.post('/api/auth/signup-request', async (req, res) => {
         const expiresAt = new Date(Date.now() + 10 * 60000).toISOString();
 
         // Expire/cleanup previous OTPs for this email
-        await supabase.from('otps').delete().eq('email', email);
+        await supabase.from('otps').delete().ilike('email', normalizedEmail);
 
         // Save new OTP
-        const { error: insertError } = await supabase.from('otps').insert([{ email, otp, expires_at: expiresAt }]);
+        const { error: insertError } = await supabase.from('otps').insert([{ email: normalizedEmail, otp, expires_at: expiresAt }]);
         if (insertError) throw insertError;
 
         // Dispatch Email dynamically
-        await sendOtpEmail(email, otp);
+        await sendOtpEmail(normalizedEmail, otp);
 
         res.json({ message: 'A 6-digit OTP code has been instantly sent to your email!' });
     } catch (err) {
@@ -417,16 +433,17 @@ app.post('/api/auth/resend-otp', async (req, res) => {
     try {
         const { email } = req.body;
         if (!email) return res.status(400).json({ error: 'Email required' });
+        const normalizedEmail = String(email).trim().toLowerCase();
         
         // Generate customized secure 6-digit OTP
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
         const expiresAt = new Date(Date.now() + 10 * 60000).toISOString();
 
-        await supabase.from('otps').delete().eq('email', email);
-        const { error: insertError } = await supabase.from('otps').insert([{ email, otp, expires_at: expiresAt }]);
+        await supabase.from('otps').delete().ilike('email', normalizedEmail);
+        const { error: insertError } = await supabase.from('otps').insert([{ email: normalizedEmail, otp, expires_at: expiresAt }]);
         if (insertError) throw insertError;
 
-        await sendOtpEmail(email, otp);
+        await sendOtpEmail(normalizedEmail, otp);
         res.json({ message: 'A fresh OTP code has been resent!' });
     } catch (err) {
         res.status(500).json({ error: 'Server error' });
@@ -438,14 +455,15 @@ app.post('/api/auth/signup-verify', async (req, res) => {
     try {
         const { name, email, password, otp } = req.body;
         if (!email || !otp) return res.status(400).json({ error: 'Email and OTP required' });
+        const normalizedEmail = String(email).trim().toLowerCase();
 
         // Verify Custom OTP
         const { data: record, error: fetchError } = await supabase
             .from('otps')
             .select('*')
-            .eq('email', email)
-            .eq('otp', otp)
-            .single();
+            .ilike('email', normalizedEmail)
+            .eq('otp', String(otp).trim())
+            .maybeSingle();
 
         if (fetchError || !record) return res.status(400).json({ error: 'Invalid or expired OTP code' });
         
@@ -462,7 +480,7 @@ app.post('/api/auth/signup-verify', async (req, res) => {
         // Insert into public.users beautifully completely independent of Supabase Auth limits
         let { data: newUser, error: insertError } = await supabase
             .from('users')
-            .insert([{ name, email, password_hash }])
+            .insert([{ name, email: normalizedEmail, password_hash }])
             .select()
             .single();
 
@@ -470,7 +488,7 @@ app.post('/api/auth/signup-verify', async (req, res) => {
         if (insertError && String(insertError.message || '').toLowerCase().includes('password_hash')) {
             const fallback = await supabase
                 .from('users')
-                .insert([{ name, email, password: password_hash }])
+                .insert([{ name, email: normalizedEmail, password: password_hash }])
                 .select()
                 .single();
             newUser = fallback.data;
@@ -483,7 +501,7 @@ app.post('/api/auth/signup-verify', async (req, res) => {
         }
 
         // Clean up OTP to prevent replay attacks
-        await supabase.from('otps').delete().eq('email', email);
+        await supabase.from('otps').delete().ilike('email', normalizedEmail);
 
         // Issue token
         const appToken = jwt.sign({ id: newUser.id, role: 'user' }, JWT_SECRET, { expiresIn: '24h' });
@@ -501,14 +519,28 @@ app.post('/api/auth/login', async (req, res) => {
         if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
         const normalizedEmail = String(email).trim().toLowerCase();
 
+        console.log(`\n[LOGIN ATTEMPT] Email: ${normalizedEmail}`);
+
         const { data: user, error } = await supabase
             .from('users')
             .select('*')
-            .eq('email', normalizedEmail)
-            .single();
+            .ilike('email', normalizedEmail)
+            .maybeSingle();
 
-        if (error || !user) return res.status(400).json({ error: 'Invalid credentials' });
-        if (user.is_active === false) return res.status(403).json({ error: 'Account deactivated by an administrator.' });
+        if (error) {
+            console.error(`[LOGIN ERROR] Supabase fetch error:`, error);
+            return res.status(500).json({ error: 'Database fetch error during login' });
+        }
+
+        if (!user) {
+            console.log(`[LOGIN FAILED] No account found for email: ${normalizedEmail}`);
+            return res.status(400).json({ error: 'No account found with this email address. Please sign up first.' });
+        }
+
+        if (user.is_active === false) {
+            console.log(`[LOGIN FAILED] Account deactivated for email: ${normalizedEmail}`);
+            return res.status(403).json({ error: 'Account deactivated by an administrator.' });
+        }
 
         const storedPrimary = typeof user.password_hash === 'string' ? user.password_hash : null;
         const storedLegacy = typeof user.password === 'string' ? user.password : null;
@@ -522,7 +554,10 @@ app.post('/api/auth/login', async (req, res) => {
             return res.status(400).json({ error: 'Account is not ready for password login. Please reset password or sign up again.' });
         }
 
-        if (!match) return res.status(400).json({ error: 'Invalid credentials' });
+        if (!match) {
+            console.log(`[LOGIN FAILED] Incorrect password for email: ${normalizedEmail}`);
+            return res.status(400).json({ error: 'Incorrect password. Please check your password and try again.' });
+        }
 
         // If legacy schema/password is used, migrate best-effort to password_hash for future logins.
         if (!storedPrimary) {
@@ -537,11 +572,13 @@ app.post('/api/auth/login', async (req, res) => {
         // Update last login telemetry
         await supabase.from('users').update({ last_login_at: new Date().toISOString() }).eq('id', user.id);
 
+        console.log(`[LOGIN SUCCESS] User authenticated successfully: ${user.name} (${user.email})`);
+
         const token = jwt.sign({ id: user.id, role: 'user' }, JWT_SECRET, { expiresIn: '24h' });
         res.json({ message: 'Logged in successfully', token, user: { name: user.name, email: user.email } });
 
     } catch (err) {
-        console.error(err);
+        console.error('[LOGIN CRASH]', err);
         res.status(500).json({ error: 'Server error during login' });
     }
 });
@@ -1175,6 +1212,7 @@ function isSupabaseFatalInitError(message) {
         || msg.includes('invalid jwt')
         || msg.includes('jwt malformed')
         || msg.includes('relation')
+    || msg.includes('could not find the table')
         || msg.includes('does not exist');
 }
 
@@ -1182,26 +1220,32 @@ async function initializeDataBackends() {
     if (supabaseUrl && supabaseKey) {
         try {
             const cloud = createClient(supabaseUrl, supabaseKey);
-            const { error } = await cloud.from('users').select('id').limit(1);
-
-            if (error && isSupabaseFatalInitError(error.message)) {
-                console.log('⚠️  Supabase access blocked (RLS/key/schema). Falling back to local JSON database.');
-                supabase = createLocalSupabaseMock();
-                return;
+            const requiredTables = ['users', 'admins', 'otps', 'messages'];
+            for (const table of requiredTables) {
+                const { error } = await cloud.from(table).select('*').limit(1);
+                if (error && isSupabaseFatalInitError(error.message)) {
+                    console.log(`ℹ️  Supabase schema is incomplete for local auth flow ('${table}'). Running in local JSON database mode.`);
+                    supabase = createLocalSupabaseMock();
+                    backendMode = 'local-json';
+                    return;
+                }
             }
 
             console.log('✅ Supabase credentials detected. Using cloud database.');
             supabase = cloud;
+            backendMode = 'supabase-cloud';
             return;
         } catch (err) {
             console.log('⚠️  Supabase initialization failed. Falling back to local JSON database.');
             supabase = createLocalSupabaseMock();
+            backendMode = 'local-json';
             return;
         }
     }
 
     console.log('⚠️  Supabase credentials missing. Falling back to local JSON database.');
     supabase = createLocalSupabaseMock();
+    backendMode = 'local-json';
 }
 
 async function ensureBackendReady(req, res, next) {
@@ -1246,4 +1290,4 @@ if (require.main === module) {
     startServer();
 }
 
-module.exports = app;
+module.exports = { app, startServer };
