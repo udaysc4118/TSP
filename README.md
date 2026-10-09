@@ -329,6 +329,6 @@ CREATE TABLE public.messages (
 
 ### ⭐ If you found this project helpful, consider giving it a star!
 
-*Built with ❤️ for Semester Project — 2026*
+
 
 </div>
