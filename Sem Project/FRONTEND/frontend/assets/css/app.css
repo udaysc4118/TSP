@@ -46,6 +46,22 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
     font-weight: 800;
     font-family: 'Outfit', sans-serif;
     letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.logo-text {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+}
+
+.logo-accent {
+    background: linear-gradient(135deg, #fb923c, #fcd34d);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
 .user-pill {
@@ -77,6 +93,22 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
 }
 .sidebar-content::-webkit-scrollbar { width: 4px; }
 .sidebar-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+
+.sidebar-section-title {
+    font-size: 22px;
+    margin-bottom: 6px;
+    font-family: 'Outfit', sans-serif;
+    color: #fff;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+}
+
+.sidebar-section-sub {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+    line-height: 1.6;
+}
 
 .weather-panel {
     padding: 12px;
@@ -290,6 +322,30 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
     z-index: 1;
     background: #e8eef5;
 }
+
+/* Map info badge (top-left overlay) */
+.map-info-badge {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 800;
+    background: rgba(10, 14, 24, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(16,185,129,0.35);
+    border-radius: 30px;
+    padding: 8px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+    pointer-events: none;
+    white-space: nowrap;
+}
 .leaflet-container {
     background: #e8eef5;
     font-family: 'Inter', sans-serif;
@@ -441,6 +497,34 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
     z-index: 5000;
     box-shadow: 0 18px 40px rgba(251,146,60,0.4);
     transition: all 0.25s var(--ease-out);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+}
+
+.fab-tooltip {
+    position: absolute;
+    right: 70px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(10,14,24,0.92);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border-light);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    padding: 5px 12px;
+    border-radius: 8px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+
+.chat-fab:hover .fab-tooltip {
+    opacity: 1;
 }
 
 .chat-fab:hover {
@@ -641,29 +725,6 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
 /* ── Floating Quick Setup Button on Map (Mobile) ── */
 .mobile-floating-setup-btn {
     display: none;
-    position: absolute;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1000;
-    background: linear-gradient(135deg, #ea580c 0%, #fb923c 100%);
-    color: #fff;
-    font-weight: 700;
-    font-size: 14px;
-    font-family: 'Outfit', sans-serif;
-    padding: 12px 22px;
-    border-radius: 30px;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    box-shadow: 0 10px 30px rgba(234, 88, 12, 0.45);
-    cursor: pointer;
-    align-items: center;
-    gap: 8px;
-    white-space: nowrap;
-    transition: all 0.25s var(--ease-out);
-}
-.mobile-floating-setup-btn:hover {
-    transform: translateX(-50%) translateY(-2px);
-    box-shadow: 0 14px 35px rgba(234, 88, 12, 0.55);
 }
 
 /* ── Responsive Analysis & Telemetry Classes ── */
@@ -734,11 +795,55 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
     position: relative;
 }
 
+.analytics-inner {
+    max-width: 1450px;
+    margin: 0 auto;
+}
+
+.section-label-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(251,146,60,0.1);
+    border: 1px solid rgba(251,146,60,0.25);
+    color: var(--brand-secondary);
+    font-size: 11px;
+    font-weight: 800;
+    font-family: 'Inter', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    padding: 6px 14px;
+    border-radius: 30px;
+    margin-bottom: 18px;
+}
+
+.analytics-card-title {
+    font-size: 18px;
+    margin-bottom: 18px;
+    color: #e2e8f0;
+    font-family: 'Outfit', sans-serif;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    font-weight: 700;
+}
+
 .analytics-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
     gap: 28px;
     margin-top: 40px;
+}
+
+.structure-side {
+    min-width: 0;
+}
+
+.breakdown-side {
+    min-width: 0;
+    position: sticky;
+    top: 28px;
+    align-self: start;
 }
 
 .matrix-scroll-wrapper {
@@ -747,6 +852,26 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
     -webkit-overflow-scrolling: touch;
     border-radius: 12px;
     margin-top: 12px;
+}
+
+#matrix table tr:hover td {
+    background: rgba(251, 146, 60, 0.05);
+    color: #fff;
+}
+
+.analytics-card {
+    background: rgba(13, 18, 32, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 18px;
+    padding: 24px;
+    transition: all 0.3s var(--ease-out);
+}
+
+.analytics-card:hover {
+    border-color: rgba(251, 146, 60, 0.35);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4), 0 0 20px rgba(251, 146, 60, 0.08);
 }
 
 /* ── Responsive Breakpoints ── */
@@ -770,14 +895,10 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
     .workspace-sidebar::after { display: none; }
 
     .workspace-map {
-        height: calc(100vh - 125px);
-        min-height: 480px;
+        height: calc(100vh - 56px);
+        min-height: 400px;
         width: 100%;
         position: relative;
-    }
-
-    .mobile-floating-setup-btn {
-        display: inline-flex;
     }
 
     /* Mobile view toggling */
@@ -792,6 +913,10 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
     .analysis-split-layout {
         grid-template-columns: 1fr;
         gap: 35px;
+    }
+
+    .breakdown-side {
+        position: static !important;
     }
 
     .svg-container-list {
@@ -854,18 +979,24 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
         bottom: 14px;
         z-index: 3000;
     }
+    .fab-tooltip { display: none; }
 
     .user-chat-panel {
-        inset: auto 12px 74px 12px;
-        width: auto;
-        max-height: calc(100vh - 140px);
+        /* Full-width bottom sheet on mobile, no overlap with FAB */
+        inset: auto 0 0 0;
+        width: 100%;
+        max-height: 70vh;
+        border-radius: 20px 20px 0 0;
         z-index: 4000;
+        bottom: 0;
+        right: 0;
+        left: 0;
     }
 }
 
 @media (max-width: 480px) {
     .logo {
-        font-size: 18px;
+        font-size: 17px;
     }
     .user-pill {
         padding: 4px 10px;
@@ -873,7 +1004,7 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
         gap: 8px;
     }
     .mobile-nav-btn {
-        padding: 8px 8px;
+        padding: 8px 6px;
         font-size: 11px;
         gap: 4px;
     }
@@ -886,6 +1017,33 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
         font-size: 14px;
     }
     .svg-block-header span:first-child {
-        font-size: 15px !important;
+        font-size: 14px !important;
+    }
+    .sidebar-section-title {
+        font-size: 19px !important;
+    }
+    /* Ensure SVG nodes don't overflow on small screens */
+    .svg-canvas-wrap svg {
+        min-height: 180px !important;
+        max-width: 100%;
+    }
+    /* Matrix table horizontal scroll */
+    .matrix-scroll-wrapper {
+        -webkit-overflow-scrolling: touch;
+    }
+    /* analysis & analytics padding */
+    .analysis-split-section,
+    .analytics-section {
+        padding: 36px 12px !important;
+    }
+    .analytics-card {
+        padding: 16px !important;
+    }
+    .analytics-grid {
+        gap: 16px !important;
+    }
+    /* chat panel full-width on very small screens */
+    .user-chat-panel {
+        border-radius: 18px 18px 0 0;
     }
 }

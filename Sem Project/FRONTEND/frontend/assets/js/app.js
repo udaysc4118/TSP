@@ -52,13 +52,26 @@ if (logoutBtn) {
 // 2. Original Map Logic Initialization
 let map;
 document.addEventListener('DOMContentLoaded', function() {
+    // ── Mobile init: show map, hide sidebar ──
+    if (window.innerWidth <= 992) {
+        const sidebar = document.getElementById('sidebarPanel');
+        const mapArea = document.getElementById('mapArea');
+        if (sidebar) sidebar.classList.add('mobile-hidden');
+        if (mapArea) mapArea.classList.remove('mobile-hidden');
+        // Ensure Map tab is active
+        const tabMap = document.getElementById('tabMapBtn');
+        const tabCtrl = document.getElementById('tabControlsBtn');
+        if (tabMap) tabMap.classList.add('active');
+        if (tabCtrl) tabCtrl.classList.remove('active');
+    }
+
     try {
         map = L.map('map', { center: [19.5,75.5], zoom:7, zoomControl: false, attributionControl: true });
         L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 19,
             attribution: '&copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012'
         }).addTo(map);
-        L.control.zoom({ position: 'topright' }).addTo(map); // Moved back to right side since right panel is gone!
+        L.control.zoom({ position: 'topright' }).addTo(map);
         setTimeout(() => map.invalidateSize(), 300);
         addCity(); addCity();
     } catch(e) {
@@ -83,8 +96,52 @@ function clearMap() {
     let strct = document.getElementById('analysisSplit');
     if(strct) strct.style.display = 'none';
     let pnl = document.getElementById('analyticsHUD');
+    if(pnl) pnl.style.display = 'none';
     let errDisp = document.getElementById('errorDisplay');
     if(errDisp) errDisp.innerHTML = '';
+    // Hide Results tab on mobile
+    const tabAnalysisBtn = document.getElementById('tabAnalysisBtn');
+    if (tabAnalysisBtn) tabAnalysisBtn.style.display = 'none';
+    // Hide map info badge
+    const mapInfoBadge = document.getElementById('mapInfoBadge');
+    if (mapInfoBadge) mapInfoBadge.style.display = 'none';
+}
+
+// ── Mobile Tab Switcher ──
+function switchMobileTab(tab) {
+    const sidebar = document.getElementById('sidebarPanel');
+    const mapArea = document.getElementById('mapArea');
+    const analysisSplit = document.getElementById('analysisSplit');
+    const analyticsHUD = document.getElementById('analyticsHUD');
+    const mobileResultsAnchor = document.getElementById('mobileResultsAnchor');
+
+    const tabMap = document.getElementById('tabMapBtn');
+    const tabCtrl = document.getElementById('tabControlsBtn');
+    const tabAnalysis = document.getElementById('tabAnalysisBtn');
+
+    // Reset active
+    [tabMap, tabCtrl, tabAnalysis].forEach(b => b && b.classList.remove('active'));
+
+    if (tab === 'map') {
+        if (sidebar) sidebar.classList.add('mobile-hidden');
+        if (mapArea) mapArea.classList.remove('mobile-hidden');
+        if (tabMap) tabMap.classList.add('active');
+        // Invalidate map size after reveal
+        setTimeout(() => { if (map) map.invalidateSize(); }, 150);
+    } else if (tab === 'controls') {
+        if (mapArea) mapArea.classList.add('mobile-hidden');
+        if (sidebar) sidebar.classList.remove('mobile-hidden');
+        if (tabCtrl) tabCtrl.classList.add('active');
+    } else if (tab === 'analysis') {
+        // Show map area (hide sidebar), then scroll to analytics (comes first)
+        if (sidebar) sidebar.classList.add('mobile-hidden');
+        if (mapArea) mapArea.classList.remove('mobile-hidden');
+        if (tabAnalysis) tabAnalysis.classList.add('active');
+        setTimeout(() => {
+            const anchor = document.getElementById('analyticsHUD') || document.getElementById('mobileResultsAnchor');
+            if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+    }
 }
 
 function addCity() {
@@ -188,6 +245,10 @@ function updateSelects() {
     let names = [];
     validRows.forEach(row => { if(row.dataset.name) names.push(row.dataset.name); });
     
+    // Update hub count badge in mobile nav
+    const badge = document.getElementById('hubCountBadge');
+    if (badge) badge.textContent = validRows.length;
+
     let s = document.getElementById('start');
     let e = document.getElementById('end');
     if(!s || !e) return;
@@ -643,7 +704,29 @@ async function run() {
     else { dataToUse = r3.segmentsData; colorToUse = '#fb923c'; iconToUse = 'ri-copper-diamond-line'; }
 
     renderBreakdown(dataToUse, names, best, bestName, colorToUse, iconToUse);
-    
-    // Smooth scroll implicitly down
-    document.querySelector('.workspace-layout').scrollIntoView({ behavior: 'smooth' });
+
+    // Show "Results" tab on mobile once analysis is ready
+    const tabAnalysisBtn = document.getElementById('tabAnalysisBtn');
+    if (tabAnalysisBtn) tabAnalysisBtn.style.display = '';
+
+    // Show the map info badge briefly
+    const mapInfoBadge = document.getElementById('mapInfoBadge');
+    const mapInfoText = document.getElementById('mapInfoText');
+    if (mapInfoBadge && mapInfoText) {
+        mapInfoText.textContent = `✓ ${bestName} — ${best.toFixed(1)} km`;
+        mapInfoBadge.style.display = 'flex';
+        setTimeout(() => { mapInfoBadge.style.display = 'none'; }, 4000);
+    }
+
+    // On desktop: scroll to results smoothly (matrix section first, then route structure below)
+    const isMobile = window.innerWidth <= 992;
+    if (!isMobile) {
+        document.getElementById('analyticsHUD')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+        // On mobile: switch map back into view, then scroll to results section
+        switchMobileTab('map');
+        setTimeout(() => {
+            document.getElementById('analyticsHUD')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 300);
+    }
 }
