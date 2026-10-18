@@ -38,13 +38,25 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// Ensure default landing page is login.html
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'frontend', 'login.html'));
-});
+// Smart Frontend Directory Finder (seamless across local, Render, Vercel, and mirrors)
+const candidateFrontendDirs = [
+    path.join(__dirname, '..', 'frontend'),
+    path.join(__dirname, '..', 'Sem Project', 'FRONTEND', 'frontend'),
+    path.join(__dirname, '..'),
+    path.join(__dirname, 'Sem Project', 'FRONTEND', 'frontend'),
+    __dirname
+];
+const frontendDir = candidateFrontendDirs.find(d => fs.existsSync(path.join(d, 'login.html'))) || __dirname;
 
-// Serve frontend static files
-app.use(express.static(path.join(__dirname, '..', 'frontend')));
+// Serve frontend static assets
+app.use(express.static(frontendDir));
+
+// Serve primary pages explicitly
+app.get('/', (req, res) => res.sendFile(path.join(frontendDir, 'login.html')));
+app.get('/login.html', (req, res) => res.sendFile(path.join(frontendDir, 'login.html')));
+app.get('/index.html', (req, res) => res.sendFile(path.join(frontendDir, 'index.html')));
+app.get('/admin.html', (req, res) => res.sendFile(path.join(frontendDir, 'admin.html')));
+
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
@@ -566,6 +578,40 @@ app.post('/api/auth/login', async (req, res) => {
         }
 
         if (!user) {
+            // Seamless check: Check if this is an admin logging in via the main portal
+            const { data: adminUser } = await supabase
+                .from('admins')
+                .select('*')
+                .or(`admin_id.eq.${normalizedEmail},admin_id.eq.${normalizedEmail.split('@')[0]}`)
+                .maybeSingle();
+
+            if (adminUser) {
+                const adminStoredPrimary = typeof adminUser.password_hash === 'string' ? adminUser.password_hash : null;
+                const adminStoredLegacy = typeof adminUser.password === 'string' ? adminUser.password : null;
+                let adminMatch = false;
+
+                if (adminStoredPrimary) {
+                    if (isBcryptHash(adminStoredPrimary)) {
+                        adminMatch = await bcrypt.compare(password, adminStoredPrimary) || (password.trim() !== password && await bcrypt.compare(password.trim(), adminStoredPrimary));
+                    } else {
+                        const { data: pgcryptRes } = await supabase.rpc('check_admin_pass', { a_id: adminUser.admin_id, a_pass: password });
+                        adminMatch = pgcryptRes;
+                    }
+                } else if (adminStoredLegacy) {
+                    adminMatch = await comparePasswordCompat(password, adminStoredLegacy) || await comparePasswordCompat(password.trim(), adminStoredLegacy);
+                }
+
+                if (adminMatch) {
+                    const token = jwt.sign({ id: adminUser.id, role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
+                    console.log(`[LOGIN SUCCESS] Admin logged in via main portal: ${adminUser.admin_id}`);
+                    return res.json({
+                        message: 'Admin clearance verified',
+                        token,
+                        user: { name: 'System Admin', email: adminUser.admin_id, role: 'admin' }
+                    });
+                }
+            }
+
             console.log(`[LOGIN FAILED] No account found for email: ${normalizedEmail}`);
             return res.status(400).json({ error: 'No account found with this email address. Please sign up first.' });
         }
@@ -580,9 +626,9 @@ app.post('/api/auth/login', async (req, res) => {
 
         let match = false;
         if (storedPrimary) {
-            match = await comparePasswordCompat(password, storedPrimary);
+            match = await comparePasswordCompat(password, storedPrimary) || (password.trim() !== password && await comparePasswordCompat(password.trim(), storedPrimary));
         } else if (storedLegacy) {
-            match = await comparePasswordCompat(password, storedLegacy);
+            match = await comparePasswordCompat(password, storedLegacy) || (password.trim() !== password && await comparePasswordCompat(password.trim(), storedLegacy));
         } else {
             return res.status(400).json({ error: 'Account is not ready for password login. Please reset password or sign up again.' });
         }
@@ -608,7 +654,8 @@ app.post('/api/auth/login', async (req, res) => {
         console.log(`[LOGIN SUCCESS] User authenticated successfully: ${user.name} (${user.email})`);
 
         const token = jwt.sign({ id: user.id, role: 'user' }, JWT_SECRET, { expiresIn: '24h' });
-        res.json({ message: 'Logged in successfully', token, user: { name: user.name, email: user.email } });
+        res.json({ message: 'Logged in successfully', token, user: { name: user.name, email: user.email, role: 'user' } });
+
 
     } catch (err) {
         console.error('[LOGIN CRASH]', err);

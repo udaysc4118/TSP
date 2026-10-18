@@ -9,7 +9,9 @@ function isTokenValid(tokenStr) {
     try {
         const parts = tokenStr.split('.');
         if (parts.length !== 3) return false;
-        const payload = JSON.parse(atob(parts[1]));
+        let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        while (b64.length % 4) b64 += '=';
+        const payload = JSON.parse(atob(b64));
         if (payload.exp && Date.now() >= payload.exp * 1000) return false;
         return true;
     } catch(e) {
@@ -30,15 +32,23 @@ if (!token || !userStr || !isTokenValid(token)) {
 } else {
     try {
         const user = JSON.parse(userStr);
-        document.getElementById("userNameDisplay").textContent = user.name || "User";
-        document.getElementById("userPill").style.display = "flex";
+        const nameEl = document.getElementById("userNameDisplay");
+        if (nameEl) nameEl.textContent = user.name || "User";
+        const pillEl = document.getElementById("userPill");
+        if (pillEl) pillEl.style.display = "flex";
         
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        if (payload.role === 'admin') {
-            document.getElementById("adminLink").style.display = "inline-flex";
+        const parts = token.split('.');
+        if (parts.length === 3) {
+            let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+            while (b64.length % 4) b64 += '=';
+            const payload = JSON.parse(atob(b64));
+            if (payload && payload.role === 'admin') {
+                const adminLink = document.getElementById("adminLink");
+                if (adminLink) adminLink.style.display = "inline-flex";
+            }
         }
     } catch(e) {
-        clearAuthAndRedirect();
+        console.warn("Non-fatal session UI update:", e);
     }
 }
 

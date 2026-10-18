@@ -18,6 +18,30 @@ const API_URL = (() => {
     return 'https://maharoute-ai-backend.onrender.com/api';
 })();
 
+const CLOUD_API_URL = 'https://maharoute-ai-backend.onrender.com/api';
+
+// Resilient API request with automatic cloud fallback
+async function apiFetch(endpoint, options = {}) {
+    const url = `${API_URL}${endpoint}`;
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 12000);
+        const res = await fetch(url, { ...options, signal: controller.signal });
+        clearTimeout(timeout);
+        return res;
+    } catch (e) {
+        if (url !== `${CLOUD_API_URL}${endpoint}`) {
+            console.warn(`[API FALLBACK] ${url} unreachable. Retrying via Cloud API...`);
+            const controller2 = new AbortController();
+            const timeout2 = setTimeout(() => controller2.abort(), 15000);
+            const res2 = await fetch(`${CLOUD_API_URL}${endpoint}`, { ...options, signal: controller2.signal });
+            clearTimeout(timeout2);
+            return res2;
+        }
+        throw e;
+    }
+}
+
 // Clear any stale credentials when arriving at login page
 sessionStorage.removeItem("mfp_token");
 sessionStorage.removeItem("mfp_user");
@@ -104,7 +128,7 @@ if (submitSignup) {
         submitSignup.innerHTML = "Sending... <i class='ri-loader-4-line ri-spin'></i>";
 
         try {
-            let res = await fetch(`${API_URL}/auth/signup-request`, {
+            let res = await apiFetch(`/auth/signup-request`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, email, password })
@@ -164,7 +188,7 @@ if (resendOtpBtn) {
         resendOtpBtn.textContent = "Sending...";
 
         try {
-            let res = await fetch(`${API_URL}/auth/resend-otp`, {
+            let res = await apiFetch(`/auth/resend-otp`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: pendingSignup.email })
@@ -208,7 +232,7 @@ if (verifyOtpBtn) {
         verifyOtpBtn.innerHTML = "Verifying... <i class='ri-loader-4-line ri-spin'></i>";
 
         try {
-            let res = await fetch(`${API_URL}/auth/signup-verify`, {
+            let res = await apiFetch(`/auth/signup-verify`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...pendingSignup, otp })
@@ -251,7 +275,7 @@ if (submitLogin) {
         submitLogin.innerHTML = "Authenticating... <i class='ri-loader-4-line ri-spin'></i>";
 
         try {
-            let res = await fetch(`${API_URL}/auth/login`, {
+            let res = await apiFetch(`/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
@@ -303,7 +327,7 @@ if (adminForm) {
         submitAdminLogin.innerHTML = "Verifying Clearance... <i class='ri-loader-4-line ri-spin'></i>";
 
         try {
-            let res = await fetch(`${API_URL}/admin/login`, {
+            let res = await apiFetch(`/admin/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ admin_id: email, password }) // Send admin_id mapped appropriately!
@@ -359,7 +383,7 @@ if (submitForgotPass) {
         submitForgotPass.innerHTML = "Sending... <i class='ri-loader-4-line ri-spin'></i>";
 
         try {
-            let res = await fetch(`${API_URL}/auth/forgot-password`, {
+            let res = await apiFetch(`/auth/forgot-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email })
@@ -423,7 +447,7 @@ if (submitResetPass) {
         submitResetPass.innerHTML = "Resetting... <i class='ri-loader-4-line ri-spin'></i>";
 
         try {
-            let res = await fetch(`${API_URL}/auth/reset-password`, {
+            let res = await apiFetch(`/auth/reset-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: forgotEmail, otp, newPassword })
@@ -473,7 +497,7 @@ if (resendResetOtp) {
         resendResetOtp.textContent = "Sending...";
 
         try {
-            let res = await fetch(`${API_URL}/auth/forgot-password`, {
+            let res = await apiFetch(`/auth/forgot-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: forgotEmail })
@@ -518,9 +542,9 @@ function bindEnterKey(inputId, buttonId) {
 
 bindEnterKey("li_email", "submitLogin");
 bindEnterKey("li_pass", "submitLogin");
-bindEnterKey("su_name", "startSignupBtn");
-bindEnterKey("su_email", "startSignupBtn");
-bindEnterKey("su_pass", "startSignupBtn");
+bindEnterKey("su_name", "submitSignup");
+bindEnterKey("su_email", "submitSignup");
+bindEnterKey("su_pass", "submitSignup");
 bindEnterKey("su_otp", "verifyOtpBtn");
 bindEnterKey("fp_email", "submitForgotPass");
 bindEnterKey("rp_otp", "submitResetPass");
