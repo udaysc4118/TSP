@@ -458,6 +458,51 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
 }
 .city-label-map::before { display: none !important; }
 
+/* ── Leaflet Layers & Zoom Controls Styling ── */
+.leaflet-control-layers {
+    background: rgba(10, 14, 24, 0.94) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    border-radius: 12px !important;
+    color: #e2e8f0 !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.6) !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 13px !important;
+    padding: 8px 12px !important;
+}
+.leaflet-control-layers-expanded {
+    padding: 10px 14px !important;
+}
+.leaflet-control-layers label {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin-bottom: 6px !important;
+    cursor: pointer !important;
+    color: #cbd5e1 !important;
+    font-weight: 600 !important;
+}
+.leaflet-control-layers label:hover {
+    color: #fb923c !important;
+}
+.leaflet-bar {
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    border-radius: 10px !important;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4) !important;
+}
+.leaflet-bar a {
+    background-color: rgba(10, 14, 24, 0.94) !important;
+    color: #fff !important;
+    border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+    transition: all 0.2s ease !important;
+}
+.leaflet-bar a:hover {
+    background-color: #1e293b !important;
+    color: #fb923c !important;
+}
+
 /* ── Leaflet Controls ── */
 .leaflet-control-zoom {
     border: none !important;
@@ -896,9 +941,19 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
 
     .workspace-map {
         height: calc(100vh - 56px);
-        min-height: 400px;
+        min-height: 420px;
         width: 100%;
         position: relative;
+        display: flex;
+        flex-direction: column;
+    }
+
+    #map {
+        width: 100% !important;
+        height: 100% !important;
+        min-height: 420px !important;
+        flex: 1;
+        z-index: 1;
     }
 
     /* Mobile view toggling */

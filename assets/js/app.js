@@ -49,8 +49,18 @@ if (logoutBtn) {
     };
 }
 
-// 2. Original Map Logic Initialization
+// 2. High-Fidelity Multi-Layer Map Logic
 let map;
+
+function triggerMapResize() {
+    if (map) {
+        map.invalidateSize();
+    }
+}
+
+window.addEventListener('resize', triggerMapResize);
+window.addEventListener('orientationchange', () => setTimeout(triggerMapResize, 250));
+
 document.addEventListener('DOMContentLoaded', function() {
     // ── Mobile init: show map, hide sidebar ──
     if (window.innerWidth <= 992) {
@@ -66,17 +76,77 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     try {
-        map = L.map('map', { center: [19.5,75.5], zoom:7, zoomControl: false, attributionControl: true });
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+        // High-Fidelity Detailed Tile Layers
+        // 1. CartoDB Voyager: Super detailed, crisp typography, clean highway markers & city labels
+        const detailedStreets = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            subdomains: 'abcd',
+            maxZoom: 20,
+            detectRetina: true,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        });
+
+        // 2. Satellite Hybrid: Real high-res satellite imagery + transportation & city name overlays
+        const satelliteImagery = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 19,
-            attribution: '&copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012'
-        }).addTo(map);
+            attribution: '&copy; Esri, Maxar, Earthstar Geographics'
+        });
+        const satelliteLabels = L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19
+        });
+        const satelliteHybrid = L.layerGroup([satelliteImagery, satelliteLabels]);
+
+        // 3. Dark Matter: Matches the dark aesthetic of MahaRoute
+        const darkMatrix = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            subdomains: 'abcd',
+            maxZoom: 20,
+            detectRetina: true,
+            attribution: '&copy; OpenStreetMap &copy; CARTO'
+        });
+
+        // 4. Standard OpenStreetMap
+        const standardOsm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors'
+        });
+
+        const initialZoom = window.innerWidth <= 768 ? 6.5 : 7;
+        map = L.map('map', {
+            center: [19.4, 75.8],
+            zoom: initialZoom,
+            zoomSnap: 0.5,
+            zoomControl: false,
+            layers: [detailedStreets],
+            attributionControl: true
+        });
+
+        // Layer Switcher Control (Detailed Streets / Satellite Hybrid / Dark Matrix / OpenStreetMap)
+        const baseLayers = {
+            "🗺️ Detailed Streets": detailedStreets,
+            "🛰️ Satellite Hybrid": satelliteHybrid,
+            "🌙 Dark Matrix": darkMatrix,
+            "🛣️ OpenStreetMap": standardOsm
+        };
+        L.control.layers(baseLayers, null, { position: 'topright' }).addTo(map);
         L.control.zoom({ position: 'topright' }).addTo(map);
-        setTimeout(() => map.invalidateSize(), 300);
+
+        // Aggressive invalidation so mobile browsers NEVER render blank or gray tiles
+        triggerMapResize();
+        setTimeout(triggerMapResize, 100);
+        setTimeout(triggerMapResize, 350);
+        setTimeout(triggerMapResize, 800);
+        setTimeout(triggerMapResize, 1500);
+
+        if (window.ResizeObserver) {
+            const mapEl = document.getElementById('map');
+            if (mapEl) {
+                new ResizeObserver(() => triggerMapResize()).observe(mapEl);
+            }
+        }
+
         addCity(); addCity();
     } catch(e) {
         let errDisplay = document.getElementById('errorDisplay');
-        if(errDisplay) errDisplay.innerHTML = '⚠️ Map core error';
+        if(errDisplay) errDisplay.innerHTML = '⚠️ Map core error: ' + (e.message || e);
     }
 });
 
@@ -126,8 +196,10 @@ function switchMobileTab(tab) {
         if (sidebar) sidebar.classList.add('mobile-hidden');
         if (mapArea) mapArea.classList.remove('mobile-hidden');
         if (tabMap) tabMap.classList.add('active');
-        // Invalidate map size after reveal
-        setTimeout(() => { if (map) map.invalidateSize(); }, 150);
+        // Force immediate and smooth tile updates
+        triggerMapResize();
+        setTimeout(triggerMapResize, 100);
+        setTimeout(triggerMapResize, 350);
     } else if (tab === 'controls') {
         if (mapArea) mapArea.classList.add('mobile-hidden');
         if (sidebar) sidebar.classList.remove('mobile-hidden');
