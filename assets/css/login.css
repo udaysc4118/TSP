@@ -304,16 +304,28 @@ body {
         min-height: 100vh;
     }
     .auth-sidebar {
-        padding: 40px 20px 24px;
+        padding: 28px 20px 24px;
         max-width: 100%;
         width: 100%;
         margin: 0 auto;
         order: 1;
         background: transparent;
+        justify-content: flex-start;
     }
     .auth-sidebar::before { display: none; }
+    .auth-logo {
+        position: relative !important;
+        top: 0 !important;
+        left: 0 !important;
+        margin-bottom: 20px !important;
+        display: inline-flex !important;
+        align-items: center;
+        gap: 8px;
+        z-index: 20;
+        font-size: 22px;
+    }
     .auth-header {
-        margin-bottom: 24px;
+        margin-bottom: 22px;
     }
     .auth-header h1 {
         font-size: 28px;
