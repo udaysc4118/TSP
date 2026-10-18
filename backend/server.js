@@ -476,7 +476,7 @@ app.post('/api/auth/signup-request', async (req, res) => {
             console.error('[EMAIL ERROR] Failed to send OTP email to', normalizedEmail, mailErr.message);
             await supabase.from('otps').delete().ilike('email', normalizedEmail);
             return res.status(500).json({ 
-                error: 'Could not send verification email to ' + normalizedEmail + '. Please check your email address and try again.' 
+                error: 'Could not send verification email: ' + (mailErr.message || 'SMTP delivery failed') 
             });
         }
 
@@ -511,7 +511,7 @@ app.post('/api/auth/resend-otp', async (req, res) => {
         } catch (mailErr) {
             console.error('[EMAIL ERROR] Resend mail error:', mailErr.message);
             await supabase.from('otps').delete().ilike('email', normalizedEmail);
-            return res.status(500).json({ error: 'Failed to resend code to your email. Please try again.' });
+            return res.status(500).json({ error: 'Failed to resend code: ' + (mailErr.message || 'SMTP error') });
         }
 
         res.json({ 
