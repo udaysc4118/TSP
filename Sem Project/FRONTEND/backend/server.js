@@ -329,60 +329,71 @@ function verifyAdminToken(req, res, next) {
 const SMTP_USER = process.env.SMTP_USER || 'omparil1212@gmail.com';
 const SMTP_PASS = process.env.SMTP_PASS || 'tdtromnxapmvevez';
 
-let activeTransporter = null;
-function getActiveTransporter() {
-    if (activeTransporter) return activeTransporter;
-    try {
-        activeTransporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                user: SMTP_USER,
-                pass: SMTP_PASS
-            },
-            connectionTimeout: 8000,
-            greetingTimeout: 8000,
-            socketTimeout: 10000
-        });
-    } catch (e) {
-        console.error("Failed to initialize mail transporter:", e);
-    }
-    return activeTransporter;
-}
-
-async function sendOtpEmail(email, otp) {
-    const mailer = getActiveTransporter();
-    if (!mailer) throw new Error("Email transporter unavailable");
-
+async function sendOtpEmail(email, otp, subjectPrefix = 'Verification Code') {
     const mailOptions = {
         from: `"MahaRoute Security" <${SMTP_USER}>`,
         to: email,
-        subject: `Your MahaRoute Verification Code: ${otp}`,
+        subject: `Your MahaRoute ${subjectPrefix}: ${otp}`,
         html: `
             <div style="font-family: Arial, sans-serif; background: #0a0c12; padding: 40px; color: #ffffff; border-radius: 10px; max-width: 600px; margin: 0 auto; text-align: center;">
                 <h1 style="color: #fb923c;">MahaRoute AI</h1>
-                <p style="font-size: 16px; color: #a0a0a0;">Here is your secure One-Time Password to complete your registration:</p>
+                <p style="font-size: 16px; color: #a0a0a0;">Here is your secure One-Time Password:</p>
                 <div style="font-size: 36px; font-weight: bold; letter-spacing: 5px; color: #ffffff; background: #1a1e2a; border: 2px dashed #fb923c; padding: 20px; border-radius: 15px; margin: 30px 0;">
                     ${otp}
                 </div>
-                <p style="font-size: 14px; color: #a0a0a0;">This code is valid for exactly 10 minutes. Please do not share it.</p>
+                <p style="font-size: 14px; color: #a0a0a0;">This code is valid for exactly 10 minutes. Please do not share it with anyone.</p>
                 <div style="margin-top: 40px; text-align: left; padding-top: 25px; border-top: 1px solid rgba(251, 146, 60, 0.3);">
-                    <p style="font-size: 15.5px; color: #e2e8f0; line-height: 1.7;">
-                        Thank you so much for choosing our route app! We are incredibly grateful to have you on board with us. 
-                        Our team has worked extremely hard to build this intelligent platform, and your support means the world to us. 
-                        We truly hope that our advanced routing algorithms and premium features help make your journeys significantly faster, smarter, and more efficient. 
-                        If you ever need any assistance or have feedback, please don't hesitate to reach out. 
-                        Welcome to the MahaRoute family—let's explore the beautiful state of Maharashtra together like never before!
+                    <p style="font-size: 15px; color: #e2e8f0; line-height: 1.7;">
+                        Thank you for using MahaRoute AI. If you did not request this verification code, please ignore this email.
                     </p>
-                    <p style="font-size: 15px; color: #fb923c; font-weight: bold; margin-top: 25px;">
+                    <p style="font-size: 15px; color: #fb923c; font-weight: bold; margin-top: 20px;">
                         Warm Regards,<br>
-                        The MahaRoute AI Team
+                        The MahaRoute AI Security Team
                     </p>
                 </div>
             </div>
         `
     };
 
-    return await mailer.sendMail(mailOptions);
+    // Primary: Port 465 (Direct SSL) with forced IPv4
+    try {
+        const mailer465 = nodemailer.createTransport({
+            host: 'smtp.gmail.com',
+            port: 465,
+            secure: true,
+            auth: {
+                user: SMTP_USER,
+                pass: SMTP_PASS
+            },
+            family: 4,
+            connectionTimeout: 10000,
+            greetingTimeout: 8000,
+            socketTimeout: 15000
+        });
+        const info = await mailer465.sendMail(mailOptions);
+        console.log(`[SMTP-465 SUCCESS] Email delivered to ${email}, id: ${info.messageId}`);
+        return info;
+    } catch (err465) {
+        console.warn(`[SMTP-465 FAILED] (${err465.message}). Trying fallback port 587...`);
+        // Secondary: Port 587 (STARTTLS) with forced IPv4
+        const mailer587 = nodemailer.createTransport({
+            host: 'smtp.gmail.com',
+            port: 587,
+            secure: false,
+            requireTLS: true,
+            auth: {
+                user: SMTP_USER,
+                pass: SMTP_PASS
+            },
+            family: 4,
+            connectionTimeout: 10000,
+            greetingTimeout: 8000,
+            socketTimeout: 15000
+        });
+        const info = await mailer587.sendMail(mailOptions);
+        console.log(`[SMTP-587 SUCCESS] Email delivered to ${email}, id: ${info.messageId}`);
+        return info;
+    }
 }
 
 // ========================
@@ -417,16 +428,20 @@ app.post('/api/auth/signup-request', async (req, res) => {
         const { error: insertError } = await supabase.from('otps').insert([{ email: normalizedEmail, otp, expires_at: expiresAt }]);
         if (insertError) throw insertError;
 
-        // Dispatch Email asynchronously in background so response returns in < 150ms!
-        sendOtpEmail(normalizedEmail, otp).then(() => {
-            console.log(`\n[REAL PRODUCTION] Email successfully sent to ${normalizedEmail}!!\n`);
-        }).catch(mailErr => {
-            console.warn('[EMAIL WARNING] Direct SMTP dispatch issue:', mailErr.message);
-        });
+        // Dispatch Email directly to user's real email inbox
+        try {
+            await sendOtpEmail(normalizedEmail, otp, 'Verification Code');
+            console.log(`\n[EMAIL DELIVERED] Real OTP email successfully sent to ${normalizedEmail}!\n`);
+        } catch (mailErr) {
+            console.error('[EMAIL ERROR] Failed to send OTP email to', normalizedEmail, mailErr.message);
+            await supabase.from('otps').delete().ilike('email', normalizedEmail);
+            return res.status(500).json({ 
+                error: 'Could not send verification email to ' + normalizedEmail + '. Please check your email address and try again.' 
+            });
+        }
 
         res.json({ 
-            message: 'A 6-digit OTP code has been instantly generated!',
-            otpHint: otp,
+            message: 'A 6-digit OTP code has been sent directly to your email inbox! Please check your email (and spam/junk folder).',
             email: normalizedEmail
         });
     } catch (err) {
@@ -450,15 +465,17 @@ app.post('/api/auth/resend-otp', async (req, res) => {
         const { error: insertError } = await supabase.from('otps').insert([{ email: normalizedEmail, otp, expires_at: expiresAt }]);
         if (insertError) throw insertError;
 
-        sendOtpEmail(normalizedEmail, otp).then(() => {
-            console.log(`\n[REAL PRODUCTION] Resend email successfully sent to ${normalizedEmail}!!\n`);
-        }).catch(mailErr => {
-            console.warn('[EMAIL WARNING] Resend SMTP issue:', mailErr.message);
-        });
+        try {
+            await sendOtpEmail(normalizedEmail, otp, 'Resend Code');
+            console.log(`\n[EMAIL DELIVERED] Resend OTP email successfully sent to ${normalizedEmail}!\n`);
+        } catch (mailErr) {
+            console.error('[EMAIL ERROR] Resend mail error:', mailErr.message);
+            await supabase.from('otps').delete().ilike('email', normalizedEmail);
+            return res.status(500).json({ error: 'Failed to resend code to your email. Please try again.' });
+        }
 
         res.json({ 
-            message: 'A fresh OTP code has been generated!',
-            otpHint: otp,
+            message: 'A fresh 6-digit OTP code has been sent directly to your email inbox! Please check your email.',
             email: normalizedEmail
         });
     } catch (err) {
@@ -629,38 +646,18 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         const { error: insertError } = await supabase.from('otps').insert([{ email: email.toLowerCase(), otp, expires_at: expiresAt }]);
         if (insertError) throw insertError;
 
-        // Send OTP via email asynchronously
+        // Send OTP via real email
         try {
-            const mailer = getActiveTransporter();
-            if (mailer) {
-                mailer.sendMail({
-                    from: `"MahaRoute Security" <${SMTP_USER}>`,
-                    to: email,
-                    subject: `Password Reset Code: ${otp}`,
-                    html: `
-                        <div style="font-family: Arial, sans-serif; background: #0a0c12; padding: 40px; color: #ffffff; border-radius: 10px; max-width: 600px; margin: 0 auto; text-align: center;">
-                            <h1 style="color: #fb923c;">MahaRoute AI</h1>
-                            <p style="font-size: 16px; color: #a0a0a0;">You requested a password reset. Here is your secure code:</p>
-                            <div style="font-size: 36px; font-weight: bold; letter-spacing: 5px; color: #ffffff; background: #1a1e2a; border: 2px dashed #ef4444; padding: 20px; border-radius: 15px; margin: 30px 0;">
-                                ${otp}
-                            </div>
-                            <p style="font-size: 14px; color: #a0a0a0;">This code expires in 10 minutes. If you didn't request this, ignore this email.</p>
-                            <p style="font-size: 15px; color: #fb923c; font-weight: bold; margin-top: 25px;">— The MahaRoute AI Team</p>
-                        </div>
-                    `
-                }).then(() => {
-                    console.log(`\n[REAL PRODUCTION] Password Reset OTP Email sent to ${email}!!\n`);
-                }).catch(mailErr => {
-                    console.warn('[EMAIL WARNING] Password reset mail issue:', mailErr.message);
-                });
-            }
+            await sendOtpEmail(email.toLowerCase(), otp, 'Password Reset Code');
+            console.log(`\n[EMAIL DELIVERED] Password Reset OTP Email sent to ${email}!!\n`);
         } catch (mailErr) {
-            console.warn('[EMAIL WARNING] Password reset dispatch issue:', mailErr.message);
+            console.error('[EMAIL ERROR] Password reset mail issue:', mailErr.message);
+            await supabase.from('otps').delete().eq('email', email.toLowerCase());
+            return res.status(500).json({ error: 'Could not send reset code to your email. Please try again.' });
         }
 
         res.json({ 
-            message: 'Password reset code generated!',
-            otpHint: otp,
+            message: 'A 6-digit password reset code has been sent directly to your email inbox! Please check your email.',
             email: email.toLowerCase()
         });
     } catch (err) {

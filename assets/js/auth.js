@@ -1,15 +1,18 @@
 // frontend/assets/js/auth.js
 
 const API_URL = (() => {
-    // Works for http(s) served pages, Live Server, and file:// opening
     if (window.location.protocol === 'file:') return 'http://localhost:5000/api';
 
     const host = window.location.hostname;
-    const port = window.location.port;
 
-    // If frontend is on localhost but different port (e.g., Live Server 5500), assume backend is 5000
-    if ((host === 'localhost' || host === '127.0.0.1') && port && port !== '5000') {
+    // Local development (localhost / 127.0.0.1 on any port)
+    if (host === 'localhost' || host === '127.0.0.1') {
         return `http://${host}:5000/api`;
+    }
+
+    // Vercel serverless deployment
+    if (host.includes('vercel.app')) {
+        return `${window.location.origin}/api`;
     }
 
     return 'https://maharoute-ai-backend.onrender.com/api';
@@ -120,14 +123,11 @@ if (submitSignup) {
             document.getElementById("signupStep1").style.display = "none";
             document.getElementById("signupStep2").style.display = "block";
             
+            const suOtpInput = document.getElementById("su_otp");
+            if (suOtpInput) suOtpInput.value = "";
+            
             let otpSuccess = document.getElementById("otpSuccess");
-            if (data.otpHint) {
-                const suOtpInput = document.getElementById("su_otp");
-                if (suOtpInput) suOtpInput.value = data.otpHint;
-                otpSuccess.innerHTML = `<i class="ri-checkbox-circle-fill"></i> Code: <b style="font-size:16px; letter-spacing:2px; color:#fff;">${data.otpHint}</b> (Auto-filled on screen + sent to email)`;
-            } else {
-                otpSuccess.textContent = data.message || "A 6-digit confirmation code has been generated!";
-            }
+            otpSuccess.innerHTML = `<i class="ri-mail-send-fill"></i> ${data.message || 'Verification code sent to your email! Please check your inbox.'}`;
             otpSuccess.style.display = "block";
             setTimeout(() => { otpSuccess.style.display = "none"; }, 8000);
 
@@ -179,13 +179,9 @@ if (resendOtpBtn) {
                 return;
             }
 
-            if (data.otpHint) {
-                const suOtpInput = document.getElementById("su_otp");
-                if (suOtpInput) suOtpInput.value = data.otpHint;
-                success.innerHTML = `<i class="ri-refresh-line"></i> New Code: <b style="font-size:16px; letter-spacing:2px; color:#fff;">${data.otpHint}</b> (Auto-filled)`;
-            } else {
-                success.textContent = "New confirmation code generated!";
-            }
+            const suOtpInput = document.getElementById("su_otp");
+            if (suOtpInput) suOtpInput.value = "";
+            success.innerHTML = `<i class="ri-refresh-line"></i> ${data.message || 'Fresh verification code sent to your email inbox!'}`;
             success.style.display = "block";
             resendOtpBtn.disabled = false;
             resendOtpBtn.textContent = "Resend Code";
@@ -388,13 +384,7 @@ if (submitForgotPass) {
             document.getElementById("rp_confirmpass").value = "";
 
             let resetSuccess = document.getElementById("resetSuccess");
-            if (data.otpHint) {
-                const rpOtpInput = document.getElementById("rp_otp");
-                if (rpOtpInput) rpOtpInput.value = data.otpHint;
-                resetSuccess.innerHTML = `<i class="ri-key-2-line"></i> Reset Code: <b style="font-size:16px; letter-spacing:2px; color:#fff;">${data.otpHint}</b> (Auto-filled)`;
-            } else {
-                resetSuccess.textContent = data.message;
-            }
+            resetSuccess.innerHTML = `<i class="ri-mail-check-line"></i> ${data.message || 'Password reset code sent to your email inbox!'}`;
             resetSuccess.style.display = "block";
             setTimeout(() => { resetSuccess.style.display = "none"; }, 8000);
 
@@ -494,13 +484,9 @@ if (resendResetOtp) {
                 err.textContent = data.error || "Failed to resend";
                 err.style.display = "block";
             } else {
-                if (data.otpHint) {
-                    const rpOtpInput = document.getElementById("rp_otp");
-                    if (rpOtpInput) rpOtpInput.value = data.otpHint;
-                    success.innerHTML = `<i class="ri-refresh-line"></i> New Code: <b style="font-size:16px; letter-spacing:2px; color:#fff;">${data.otpHint}</b> (Auto-filled)`;
-                } else {
-                    success.textContent = "New reset code sent!";
-                }
+                const rpOtpInput = document.getElementById("rp_otp");
+                if (rpOtpInput) rpOtpInput.value = "";
+                success.innerHTML = `<i class="ri-refresh-line"></i> ${data.message || 'New reset code sent to your email inbox!'}`;
                 success.style.display = "block";
                 setTimeout(() => { success.style.display = "none"; }, 6000);
             }
