@@ -34,6 +34,18 @@ app.use((req, res, next) => {
     next();
 });
 app.use(express.json());
+app.use((req, res, next) => {
+    if (!req.url.startsWith('/api') && (
+        req.url.startsWith('/auth') ||
+        req.url.startsWith('/admin') ||
+        req.url.startsWith('/ai') ||
+        req.url.startsWith('/chat') ||
+        req.url.startsWith('/health')
+    )) {
+        req.url = '/api' + req.url;
+    }
+    next();
+});
 
 let initPromise = null;
 let backendMode = 'initializing';
@@ -385,9 +397,9 @@ async function sendOtpEmail(email, otp, subjectPrefix = 'Verification Code') {
                 user: SMTP_USER,
                 pass: SMTP_PASS
             },
-            connectionTimeout: 10000,
-            greetingTimeout: 8000,
-            socketTimeout: 15000
+            connectionTimeout: 4000,
+            greetingTimeout: 3000,
+            socketTimeout: 6000
         });
         const info = await serviceMailer.sendMail(mailOptions);
         console.log(`[SMTP-GMAIL SUCCESS] Email delivered to ${email}, id: ${info.messageId}`);
@@ -406,9 +418,9 @@ async function sendOtpEmail(email, otp, subjectPrefix = 'Verification Code') {
                 user: SMTP_USER,
                 pass: SMTP_PASS
             },
-            connectionTimeout: 10000,
-            greetingTimeout: 8000,
-            socketTimeout: 15000
+            connectionTimeout: 4000,
+            greetingTimeout: 3000,
+            socketTimeout: 6000
         });
         const info = await mailer465.sendMail(mailOptions);
         console.log(`[SMTP-465 SUCCESS] Email delivered to ${email}, id: ${info.messageId}`);
@@ -427,9 +439,9 @@ async function sendOtpEmail(email, otp, subjectPrefix = 'Verification Code') {
             user: SMTP_USER,
             pass: SMTP_PASS
         },
-        connectionTimeout: 10000,
-        greetingTimeout: 8000,
-        socketTimeout: 15000
+        connectionTimeout: 4000,
+        greetingTimeout: 3000,
+        socketTimeout: 6000
     });
     const info = await mailer587.sendMail(mailOptions);
     console.log(`[SMTP-587 SUCCESS] Email delivered to ${email}, id: ${info.messageId}`);

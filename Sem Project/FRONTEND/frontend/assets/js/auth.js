@@ -15,7 +15,12 @@ const API_URL = (() => {
         return `http://${host}:5000/api`;
     }
 
-    // All cloud & live hosting (Vercel, Render, Netlify, custom domain) connects directly to Render backend
+    // Vercel serverless deployment
+    if (host.includes('vercel.app')) {
+        return `${window.location.origin}/api`;
+    }
+
+    // Default to Render Cloud Backend
     return CLOUD_API_URL;
 })();
 
@@ -42,7 +47,7 @@ async function apiFetch(endpoint, options = {}) {
     for (const url of urlsToTry) {
         try {
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 15000);
+            const timeout = setTimeout(() => controller.abort(), 60000);
             const res = await fetch(url, { ...options, signal: controller.signal });
             clearTimeout(timeout);
 
@@ -54,7 +59,11 @@ async function apiFetch(endpoint, options = {}) {
             return res;
         } catch (e) {
             console.warn(`[API FETCH FAILED] ${url}:`, e.message);
-            lastError = e;
+            if (e.name === 'AbortError') {
+                lastError = new Error('Connection timed out. Please try again.');
+            } else {
+                lastError = e;
+            }
         }
     }
     throw lastError || new Error('Server connection error. Please try again.');
