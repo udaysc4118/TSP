@@ -377,7 +377,26 @@ async function sendOtpEmail(email, otp, subjectPrefix = 'Verification Code') {
         `
     };
 
-    // Primary: Port 465 (Direct SSL) with forced IPv4
+    // Tier 1: Service Gmail (Highest compatibility on all cloud platforms including Render & Vercel)
+    try {
+        const serviceMailer = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: SMTP_USER,
+                pass: SMTP_PASS
+            },
+            connectionTimeout: 10000,
+            greetingTimeout: 8000,
+            socketTimeout: 15000
+        });
+        const info = await serviceMailer.sendMail(mailOptions);
+        console.log(`[SMTP-GMAIL SUCCESS] Email delivered to ${email}, id: ${info.messageId}`);
+        return info;
+    } catch (errService) {
+        console.warn(`[SMTP-GMAIL FAILED] (${errService.message}). Trying direct port 465...`);
+    }
+
+    // Tier 2: Port 465 (Direct SSL)
     try {
         const mailer465 = nodemailer.createTransport({
             host: 'smtp.gmail.com',
@@ -387,7 +406,6 @@ async function sendOtpEmail(email, otp, subjectPrefix = 'Verification Code') {
                 user: SMTP_USER,
                 pass: SMTP_PASS
             },
-            family: 4,
             connectionTimeout: 10000,
             greetingTimeout: 8000,
             socketTimeout: 15000
@@ -397,25 +415,25 @@ async function sendOtpEmail(email, otp, subjectPrefix = 'Verification Code') {
         return info;
     } catch (err465) {
         console.warn(`[SMTP-465 FAILED] (${err465.message}). Trying fallback port 587...`);
-        // Secondary: Port 587 (STARTTLS) with forced IPv4
-        const mailer587 = nodemailer.createTransport({
-            host: 'smtp.gmail.com',
-            port: 587,
-            secure: false,
-            requireTLS: true,
-            auth: {
-                user: SMTP_USER,
-                pass: SMTP_PASS
-            },
-            family: 4,
-            connectionTimeout: 10000,
-            greetingTimeout: 8000,
-            socketTimeout: 15000
-        });
-        const info = await mailer587.sendMail(mailOptions);
-        console.log(`[SMTP-587 SUCCESS] Email delivered to ${email}, id: ${info.messageId}`);
-        return info;
     }
+
+    // Tier 3: Port 587 (STARTTLS)
+    const mailer587 = nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 587,
+        secure: false,
+        requireTLS: true,
+        auth: {
+            user: SMTP_USER,
+            pass: SMTP_PASS
+        },
+        connectionTimeout: 10000,
+        greetingTimeout: 8000,
+        socketTimeout: 15000
+    });
+    const info = await mailer587.sendMail(mailOptions);
+    console.log(`[SMTP-587 SUCCESS] Email delivered to ${email}, id: ${info.messageId}`);
+    return info;
 }
 
 // ========================
