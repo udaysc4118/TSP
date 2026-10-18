@@ -68,8 +68,9 @@ app.get('/index.html', (req, res) => res.sendFile(path.join(frontendDir, 'index.
 app.get('/admin.html', (req, res) => res.sendFile(path.join(frontendDir, 'admin.html')));
 
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY;
+const supabaseUrl = process.env.SUPABASE_URL || 'https://qcrvyeemxuzvmwwaiwgj.supabase.co';
+const supabaseKey = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFjcnZ5ZWVteHV6dm13d2Fpd2dqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNzEyNzcsImV4cCI6MjA4OTk0NzI3N30.2YRdrItqyHo1PEgzFWn73IuH37Z9vbZkh0pBn9XzAks';
+const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_key_maharoute_2026!';
 let supabase;
 
 const isVercelRuntime = Boolean(process.env.VERCEL);
@@ -293,7 +294,6 @@ function createLocalSupabaseMock() {
     };
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'default_secret_key_for_jwt_12345';
 const ADMIN_ONLINE_TIMEOUT_MS = 70000;
 const AUTO_WAITING_MESSAGE = 'Admin is currently offline. Please wait, your message has been received and you will get a reply shortly.';
 let adminLastSeenAt = 0;
