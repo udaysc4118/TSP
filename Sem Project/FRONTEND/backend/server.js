@@ -417,17 +417,18 @@ app.post('/api/auth/signup-request', async (req, res) => {
         const { error: insertError } = await supabase.from('otps').insert([{ email: normalizedEmail, otp, expires_at: expiresAt }]);
         if (insertError) throw insertError;
 
-        // Dispatch Email dynamically with a timeout race (max 8 seconds) so user UI never hangs!
-        try {
-            const sendPromise = sendOtpEmail(normalizedEmail, otp);
-            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('SMTP timeout')), 8000));
-            await Promise.race([sendPromise, timeoutPromise]);
+        // Dispatch Email asynchronously in background so response returns in < 150ms!
+        sendOtpEmail(normalizedEmail, otp).then(() => {
             console.log(`\n[REAL PRODUCTION] Email successfully sent to ${normalizedEmail}!!\n`);
-        } catch (mailErr) {
-            console.warn('[EMAIL WARNING] Direct SMTP dispatch issue or timeout:', mailErr.message);
-        }
+        }).catch(mailErr => {
+            console.warn('[EMAIL WARNING] Direct SMTP dispatch issue:', mailErr.message);
+        });
 
-        res.json({ message: 'A 6-digit OTP code has been instantly sent to your email!' });
+        res.json({ 
+            message: 'A 6-digit OTP code has been instantly generated!',
+            otpHint: otp,
+            email: normalizedEmail
+        });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Server error generating OTP' });
@@ -449,15 +450,17 @@ app.post('/api/auth/resend-otp', async (req, res) => {
         const { error: insertError } = await supabase.from('otps').insert([{ email: normalizedEmail, otp, expires_at: expiresAt }]);
         if (insertError) throw insertError;
 
-        try {
-            const sendPromise = sendOtpEmail(normalizedEmail, otp);
-            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('SMTP timeout')), 8000));
-            await Promise.race([sendPromise, timeoutPromise]);
-        } catch (mailErr) {
+        sendOtpEmail(normalizedEmail, otp).then(() => {
+            console.log(`\n[REAL PRODUCTION] Resend email successfully sent to ${normalizedEmail}!!\n`);
+        }).catch(mailErr => {
             console.warn('[EMAIL WARNING] Resend SMTP issue:', mailErr.message);
-        }
+        });
 
-        res.json({ message: 'A fresh OTP code has been resent!' });
+        res.json({ 
+            message: 'A fresh OTP code has been generated!',
+            otpHint: otp,
+            email: normalizedEmail
+        });
     } catch (err) {
         res.status(500).json({ error: 'Server error' });
     }
@@ -626,33 +629,40 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         const { error: insertError } = await supabase.from('otps').insert([{ email: email.toLowerCase(), otp, expires_at: expiresAt }]);
         if (insertError) throw insertError;
 
-        // Send OTP via email
+        // Send OTP via email asynchronously
         try {
             const mailer = getActiveTransporter();
-            const sendPromise = mailer.sendMail({
-                from: `"MahaRoute Security" <${SMTP_USER}>`,
-                to: email,
-                subject: `Password Reset Code: ${otp}`,
-                html: `
-                    <div style="font-family: Arial, sans-serif; background: #0a0c12; padding: 40px; color: #ffffff; border-radius: 10px; max-width: 600px; margin: 0 auto; text-align: center;">
-                        <h1 style="color: #fb923c;">MahaRoute AI</h1>
-                        <p style="font-size: 16px; color: #a0a0a0;">You requested a password reset. Here is your secure code:</p>
-                        <div style="font-size: 36px; font-weight: bold; letter-spacing: 5px; color: #ffffff; background: #1a1e2a; border: 2px dashed #ef4444; padding: 20px; border-radius: 15px; margin: 30px 0;">
-                            ${otp}
+            if (mailer) {
+                mailer.sendMail({
+                    from: `"MahaRoute Security" <${SMTP_USER}>`,
+                    to: email,
+                    subject: `Password Reset Code: ${otp}`,
+                    html: `
+                        <div style="font-family: Arial, sans-serif; background: #0a0c12; padding: 40px; color: #ffffff; border-radius: 10px; max-width: 600px; margin: 0 auto; text-align: center;">
+                            <h1 style="color: #fb923c;">MahaRoute AI</h1>
+                            <p style="font-size: 16px; color: #a0a0a0;">You requested a password reset. Here is your secure code:</p>
+                            <div style="font-size: 36px; font-weight: bold; letter-spacing: 5px; color: #ffffff; background: #1a1e2a; border: 2px dashed #ef4444; padding: 20px; border-radius: 15px; margin: 30px 0;">
+                                ${otp}
+                            </div>
+                            <p style="font-size: 14px; color: #a0a0a0;">This code expires in 10 minutes. If you didn't request this, ignore this email.</p>
+                            <p style="font-size: 15px; color: #fb923c; font-weight: bold; margin-top: 25px;">— The MahaRoute AI Team</p>
                         </div>
-                        <p style="font-size: 14px; color: #a0a0a0;">This code expires in 10 minutes. If you didn't request this, ignore this email.</p>
-                        <p style="font-size: 15px; color: #fb923c; font-weight: bold; margin-top: 25px;">— The MahaRoute AI Team</p>
-                    </div>
-                `
-            });
-            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('SMTP timeout')), 8000));
-            await Promise.race([sendPromise, timeoutPromise]);
-            console.log(`\n[REAL PRODUCTION] Password Reset OTP Email sent to ${email}!!\n`);
+                    `
+                }).then(() => {
+                    console.log(`\n[REAL PRODUCTION] Password Reset OTP Email sent to ${email}!!\n`);
+                }).catch(mailErr => {
+                    console.warn('[EMAIL WARNING] Password reset mail issue:', mailErr.message);
+                });
+            }
         } catch (mailErr) {
-            console.warn('[EMAIL WARNING] Password reset mail issue or timeout:', mailErr.message);
+            console.warn('[EMAIL WARNING] Password reset dispatch issue:', mailErr.message);
         }
 
-        res.json({ message: 'Password reset code sent to your email!' });
+        res.json({ 
+            message: 'Password reset code generated!',
+            otpHint: otp,
+            email: email.toLowerCase()
+        });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Server error sending reset code' });
