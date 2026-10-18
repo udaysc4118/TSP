@@ -579,11 +579,11 @@ app.post('/api/auth/login', async (req, res) => {
 
         if (!user) {
             // Seamless check: Check if this is an admin logging in via the main portal
-            const { data: adminUser } = await supabase
+            const { data: adminMatches } = await supabase
                 .from('admins')
                 .select('*')
-                .or(`admin_id.eq.${normalizedEmail},admin_id.eq.${normalizedEmail.split('@')[0]}`)
-                .maybeSingle();
+                .or(`admin_id.eq.${normalizedEmail},admin_id.eq.${normalizedEmail.split('@')[0]}`);
+            const adminUser = Array.isArray(adminMatches) && adminMatches.length > 0 ? adminMatches[0] : null;
 
             if (adminUser) {
                 const adminStoredPrimary = typeof adminUser.password_hash === 'string' ? adminUser.password_hash : null;
