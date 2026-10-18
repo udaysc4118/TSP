@@ -1,45 +1,63 @@
 // frontend/assets/js/auth.js
 
+const CLOUD_API_URL = 'https://maharoute-ai-backend.onrender.com/api';
+
 const API_URL = (() => {
+    if (typeof window === 'undefined') return CLOUD_API_URL;
     if (window.location.protocol === 'file:') return 'http://localhost:5000/api';
 
     const host = window.location.hostname;
+    const port = window.location.port;
 
-    // Local development (localhost / 127.0.0.1 on any port)
+    // Local development only (localhost / 127.0.0.1)
     if (host === 'localhost' || host === '127.0.0.1') {
+        if (port === '5000' || !port) return `${window.location.protocol}//${host}:5000/api`;
         return `http://${host}:5000/api`;
     }
 
-    // Vercel serverless deployment
-    if (host.includes('vercel.app')) {
-        return `${window.location.origin}/api`;
-    }
-
-    return 'https://maharoute-ai-backend.onrender.com/api';
+    // All cloud & live hosting (Vercel, Render, Netlify, custom domain) connects directly to Render backend
+    return CLOUD_API_URL;
 })();
 
-const CLOUD_API_URL = 'https://maharoute-ai-backend.onrender.com/api';
+// Safe response parser that never throws on HTML error pages
+async function parseResponse(res) {
+    try {
+        const data = await res.json();
+        return data || {};
+    } catch (e) {
+        return { error: res.ok ? "Unexpected server response" : `Server returned HTTP ${res.status}` };
+    }
+}
 
 // Resilient API request with automatic cloud fallback
 async function apiFetch(endpoint, options = {}) {
-    const url = `${API_URL}${endpoint}`;
-    try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 12000);
-        const res = await fetch(url, { ...options, signal: controller.signal });
-        clearTimeout(timeout);
-        return res;
-    } catch (e) {
-        if (url !== `${CLOUD_API_URL}${endpoint}`) {
-            console.warn(`[API FALLBACK] ${url} unreachable. Retrying via Cloud API...`);
-            const controller2 = new AbortController();
-            const timeout2 = setTimeout(() => controller2.abort(), 15000);
-            const res2 = await fetch(`${CLOUD_API_URL}${endpoint}`, { ...options, signal: controller2.signal });
-            clearTimeout(timeout2);
-            return res2;
-        }
-        throw e;
+    const primaryUrl = `${API_URL}${endpoint}`;
+    const fallbackUrl = `${CLOUD_API_URL}${endpoint}`;
+    const urlsToTry = [primaryUrl];
+    if (primaryUrl !== fallbackUrl) {
+        urlsToTry.push(fallbackUrl);
     }
+
+    let lastError = null;
+    for (const url of urlsToTry) {
+        try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 15000);
+            const res = await fetch(url, { ...options, signal: controller.signal });
+            clearTimeout(timeout);
+
+            // If a host returned 404 (e.g. static host attempting local /api), fallback to cloud
+            if (!res.ok && res.status === 404 && url !== fallbackUrl) {
+                console.warn(`[API FALLBACK] ${url} returned 404. Falling back to Cloud API...`);
+                continue;
+            }
+            return res;
+        } catch (e) {
+            console.warn(`[API FETCH FAILED] ${url}:`, e.message);
+            lastError = e;
+        }
+    }
+    throw lastError || new Error('Server connection error. Please try again.');
 }
 
 // Clear any stale credentials when arriving at login page
@@ -133,7 +151,7 @@ if (submitSignup) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, email, password })
             });
-            let data = await res.json();
+            let data = await parseResponse(res);
             
             if (!res.ok) {
                 err.textContent = data.error || "Signup failed";
@@ -158,7 +176,8 @@ if (submitSignup) {
             submitSignup.disabled = false;
             submitSignup.innerHTML = "Create Account <i class='ri-arrow-right-line'></i>";
         } catch(e) {
-            err.textContent="Server connection error";
+            console.error('[SIGNUP ERROR]', e);
+            err.textContent = (e && e.message && e.message !== 'Failed to fetch') ? e.message : "Server connection error. Please try again.";
             err.style.display="block";
             submitSignup.disabled = false;
             submitSignup.innerHTML = "Create Account <i class='ri-arrow-right-line'></i>";
@@ -173,7 +192,7 @@ if (backToSignup) {
         document.getElementById("signupStep2").style.display = "none";
         document.getElementById("signupStep1").style.display = "block";
         document.getElementById("otpErr").style.display = "none";
-    }
+    };
 }
 
 const resendOtpBtn = document.getElementById("resendOtpBtn");
@@ -193,7 +212,7 @@ if (resendOtpBtn) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: pendingSignup.email })
             });
-            let data = await res.json();
+            let data = await parseResponse(res);
             
             if (!res.ok) {
                 err.textContent = data.error || "Failed to resend";
@@ -211,7 +230,8 @@ if (resendOtpBtn) {
             resendOtpBtn.textContent = "Resend Code";
             setTimeout(() => { success.style.display = "none"; }, 6000);
         } catch(e) {
-            err.textContent="Server connection error";
+            console.error('[RESEND ERROR]', e);
+            err.textContent = (e && e.message && e.message !== 'Failed to fetch') ? e.message : "Server connection error. Please try again.";
             err.style.display="block";
             resendOtpBtn.disabled = false;
             resendOtpBtn.textContent = "Resend Code";
@@ -237,7 +257,7 @@ if (verifyOtpBtn) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...pendingSignup, otp })
             });
-            let data = await res.json();
+            let data = await parseResponse(res);
             
             if (!res.ok) {
                 err.textContent = data.error || "Verification failed";
@@ -253,7 +273,8 @@ if (verifyOtpBtn) {
             localStorage.setItem("mfp_user", JSON.stringify(data.user));
             window.location="index.html";
         } catch(e) {
-            err.textContent="Server connection error";
+            console.error('[VERIFY ERROR]', e);
+            err.textContent = (e && e.message && e.message !== 'Failed to fetch') ? e.message : "Server connection error. Please try again.";
             err.style.display="block";
             verifyOtpBtn.disabled = false;
             verifyOtpBtn.innerHTML = "Verify & Access";
@@ -280,7 +301,7 @@ if (submitLogin) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
             });
-            let data = await res.json();
+            let data = await parseResponse(res);
             
             if (!res.ok) {
                 err.textContent= data.error || "Invalid credentials";
@@ -301,7 +322,8 @@ if (submitLogin) {
                 window.location="index.html";
             }
         } catch(e) {
-            err.textContent="Server connection error";
+            console.error('[LOGIN ERROR]', e);
+            err.textContent = (e && e.message && e.message !== 'Failed to fetch') ? e.message : "Server connection error. Please try again.";
             err.style.display="block";
             submitLogin.disabled = false;
             submitLogin.innerHTML = "Sign In <i class='ri-login-box-line'></i>";
@@ -332,7 +354,7 @@ if (adminForm) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ admin_id: email, password }) // Send admin_id mapped appropriately!
             });
-            let data = await res.json();
+            let data = await parseResponse(res);
             
             if (!res.ok) {
                 err.textContent= data.error || "Invalid clearance credentials";
@@ -351,7 +373,8 @@ if (adminForm) {
                 window.location = "admin.html";
             }
         } catch(e) {
-            err.textContent="Server connection error";
+            console.error('[ADMIN LOGIN ERROR]', e);
+            err.textContent = (e && e.message && e.message !== 'Failed to fetch') ? e.message : "Server connection error. Please try again.";
             err.style.display="block";
             submitAdminLogin.disabled = false;
             submitAdminLogin.innerHTML = "Verify Clearance <i class='ri-shield-check-line'></i>";
@@ -388,7 +411,7 @@ if (submitForgotPass) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email })
             });
-            let data = await res.json();
+            let data = await parseResponse(res);
 
             if (!res.ok) {
                 err.textContent = data.error || "Failed to send reset code";
@@ -417,7 +440,8 @@ if (submitForgotPass) {
             submitForgotPass.disabled = false;
             submitForgotPass.innerHTML = "Send Reset Code <i class='ri-mail-send-line'></i>";
         } catch (e) {
-            err.textContent = "Server connection error";
+            console.error('[FORGOT PASS ERROR]', e);
+            err.textContent = (e && e.message && e.message !== 'Failed to fetch') ? e.message : "Server connection error. Please try again.";
             err.style.display = "block";
             submitForgotPass.disabled = false;
             submitForgotPass.innerHTML = "Send Reset Code <i class='ri-mail-send-line'></i>";
@@ -452,7 +476,7 @@ if (submitResetPass) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: forgotEmail, otp, newPassword })
             });
-            let data = await res.json();
+            let data = await parseResponse(res);
 
             if (!res.ok) {
                 err.textContent = data.error || "Reset failed";
@@ -474,7 +498,8 @@ if (submitResetPass) {
             }, 2500);
 
         } catch (e) {
-            err.textContent = "Server connection error";
+            console.error('[RESET PASS ERROR]', e);
+            err.textContent = (e && e.message && e.message !== 'Failed to fetch') ? e.message : "Server connection error. Please try again.";
             err.style.display = "block";
             submitResetPass.disabled = false;
             submitResetPass.innerHTML = "Reset Password <i class='ri-lock-password-line'></i>";
@@ -502,7 +527,7 @@ if (resendResetOtp) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: forgotEmail })
             });
-            let data = await res.json();
+            let data = await parseResponse(res);
 
             if (!res.ok) {
                 err.textContent = data.error || "Failed to resend";
@@ -518,7 +543,8 @@ if (resendResetOtp) {
             resendResetOtp.disabled = false;
             resendResetOtp.textContent = "Resend Code";
         } catch (e) {
-            err.textContent = "Server connection error";
+            console.error('[RESEND RESET ERROR]', e);
+            err.textContent = (e && e.message && e.message !== 'Failed to fetch') ? e.message : "Server connection error. Please try again.";
             err.style.display = "block";
             resendResetOtp.disabled = false;
             resendResetOtp.textContent = "Resend Code";
