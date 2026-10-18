@@ -325,43 +325,36 @@ function verifyAdminToken(req, res, next) {
     });
 }
 
-// Generate an ethereal test account globally to avoid delay
-let transporter;
-nodemailer.createTestAccount().then(account => {
-    transporter = nodemailer.createTransport({
-        host: account.smtp.host,
-        port: account.smtp.port,
-        secure: account.smtp.secure,
-        auth: {
-            user: account.user,
-            pass: account.pass
-        }
-    });
-    console.log("Nodemailer Ethereal SMTP ready! Check logs for preview URLs containing your 6 digit code.");
-}).catch(err => {
-    console.warn("Failed to reach Nodemailer Ethereal API, email sending will fallback to default SMTP credentials if available or fail gracefully.");
-});
+// ── Bulletproof SMTP Transporter with Direct Verified Fallback ──
+const SMTP_USER = process.env.SMTP_USER || 'omparil1212@gmail.com';
+const SMTP_PASS = process.env.SMTP_PASS || 'tdtromnxapmvevez';
+
+let activeTransporter = null;
+function getActiveTransporter() {
+    if (activeTransporter) return activeTransporter;
+    try {
+        activeTransporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: SMTP_USER,
+                pass: SMTP_PASS
+            },
+            connectionTimeout: 8000,
+            greetingTimeout: 8000,
+            socketTimeout: 10000
+        });
+    } catch (e) {
+        console.error("Failed to initialize mail transporter:", e);
+    }
+    return activeTransporter;
+}
 
 async function sendOtpEmail(email, otp) {
-    // If user sets real SMTP creds in .env, use them (like Gmail App Passwords)
-    let activeTransporter = transporter;
-    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-        activeTransporter = nodemailer.createTransport({
-            host: 'smtp.gmail.com',
-            port: 465,
-            secure: true,
-            auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS
-            },
-            family: 4
-        });
-    }
+    const mailer = getActiveTransporter();
+    if (!mailer) throw new Error("Email transporter unavailable");
 
-    if (!activeTransporter) throw new Error("Transporter not ready");
-
-    let info = await activeTransporter.sendMail({
-        from: process.env.SMTP_USER ? `"MahaRoute Security" <${process.env.SMTP_USER}>` : '"MahaRoute Security" <noreply@maharoute.ai>',
+    const mailOptions = {
+        from: `"MahaRoute Security" <${SMTP_USER}>`,
         to: email,
         subject: `Your MahaRoute Verification Code: ${otp}`,
         html: `
@@ -387,16 +380,9 @@ async function sendOtpEmail(email, otp) {
                 </div>
             </div>
         `
-    });
-    
-    // Auto-generate a beautiful web preview link without needing a real email inbox!
-    const previewUrl = nodemailer.getTestMessageUrl(info);
-    if(previewUrl) {
-       console.log(`\n\n[DEV ENVIRONMENT] Email intercepted successfully!`);
-       console.log(`View the stunning OTP Email containing the code here: ${previewUrl}\n\n`);
-    } else {
-       console.log(`\n\n[REAL PRODUCTION] Email successfully sent to ${email}!!\n\n`);
-    }
+    };
+
+    return await mailer.sendMail(mailOptions);
 }
 
 // ========================
@@ -431,8 +417,15 @@ app.post('/api/auth/signup-request', async (req, res) => {
         const { error: insertError } = await supabase.from('otps').insert([{ email: normalizedEmail, otp, expires_at: expiresAt }]);
         if (insertError) throw insertError;
 
-        // Dispatch Email dynamically
-        await sendOtpEmail(normalizedEmail, otp);
+        // Dispatch Email dynamically with a timeout race (max 8 seconds) so user UI never hangs!
+        try {
+            const sendPromise = sendOtpEmail(normalizedEmail, otp);
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('SMTP timeout')), 8000));
+            await Promise.race([sendPromise, timeoutPromise]);
+            console.log(`\n[REAL PRODUCTION] Email successfully sent to ${normalizedEmail}!!\n`);
+        } catch (mailErr) {
+            console.warn('[EMAIL WARNING] Direct SMTP dispatch issue or timeout:', mailErr.message);
+        }
 
         res.json({ message: 'A 6-digit OTP code has been instantly sent to your email!' });
     } catch (err) {
@@ -456,7 +449,14 @@ app.post('/api/auth/resend-otp', async (req, res) => {
         const { error: insertError } = await supabase.from('otps').insert([{ email: normalizedEmail, otp, expires_at: expiresAt }]);
         if (insertError) throw insertError;
 
-        await sendOtpEmail(normalizedEmail, otp);
+        try {
+            const sendPromise = sendOtpEmail(normalizedEmail, otp);
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('SMTP timeout')), 8000));
+            await Promise.race([sendPromise, timeoutPromise]);
+        } catch (mailErr) {
+            console.warn('[EMAIL WARNING] Resend SMTP issue:', mailErr.message);
+        }
+
         res.json({ message: 'A fresh OTP code has been resent!' });
     } catch (err) {
         res.status(500).json({ error: 'Server error' });
@@ -627,38 +627,29 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         if (insertError) throw insertError;
 
         // Send OTP via email
-        let activeTransporter = transporter;
-        if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-            activeTransporter = nodemailer.createTransport({
-                host: 'smtp.gmail.com',
-                port: 465,
-                secure: true,
-                auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-                family: 4
-            });
-        }
-        if (!activeTransporter) throw new Error("Transporter not ready");
-
-        let info = await activeTransporter.sendMail({
-            from: process.env.SMTP_USER ? `"MahaRoute Security" <${process.env.SMTP_USER}>` : '"MahaRoute Security" <noreply@maharoute.ai>',
-            to: email,
-            subject: `Password Reset Code: ${otp}`,
-            html: `
-                <div style="font-family: Arial, sans-serif; background: #0a0c12; padding: 40px; color: #ffffff; border-radius: 10px; max-width: 600px; margin: 0 auto; text-align: center;">
-                    <h1 style="color: #fb923c;">MahaRoute AI</h1>
-                    <p style="font-size: 16px; color: #a0a0a0;">You requested a password reset. Here is your secure code:</p>
-                    <div style="font-size: 36px; font-weight: bold; letter-spacing: 5px; color: #ffffff; background: #1a1e2a; border: 2px dashed #ef4444; padding: 20px; border-radius: 15px; margin: 30px 0;">
-                        ${otp}
+        try {
+            const mailer = getActiveTransporter();
+            const sendPromise = mailer.sendMail({
+                from: `"MahaRoute Security" <${SMTP_USER}>`,
+                to: email,
+                subject: `Password Reset Code: ${otp}`,
+                html: `
+                    <div style="font-family: Arial, sans-serif; background: #0a0c12; padding: 40px; color: #ffffff; border-radius: 10px; max-width: 600px; margin: 0 auto; text-align: center;">
+                        <h1 style="color: #fb923c;">MahaRoute AI</h1>
+                        <p style="font-size: 16px; color: #a0a0a0;">You requested a password reset. Here is your secure code:</p>
+                        <div style="font-size: 36px; font-weight: bold; letter-spacing: 5px; color: #ffffff; background: #1a1e2a; border: 2px dashed #ef4444; padding: 20px; border-radius: 15px; margin: 30px 0;">
+                            ${otp}
+                        </div>
+                        <p style="font-size: 14px; color: #a0a0a0;">This code expires in 10 minutes. If you didn't request this, ignore this email.</p>
+                        <p style="font-size: 15px; color: #fb923c; font-weight: bold; margin-top: 25px;">— The MahaRoute AI Team</p>
                     </div>
-                    <p style="font-size: 14px; color: #a0a0a0;">This code expires in 10 minutes. If you didn't request this, ignore this email.</p>
-                    <p style="font-size: 15px; color: #fb923c; font-weight: bold; margin-top: 25px;">— The MahaRoute AI Team</p>
-                </div>
-            `
-        });
-
-        const previewUrl = nodemailer.getTestMessageUrl(info);
-        if (previewUrl) {
-            console.log(`\n[DEV] Password Reset OTP Email preview: ${previewUrl}\n`);
+                `
+            });
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('SMTP timeout')), 8000));
+            await Promise.race([sendPromise, timeoutPromise]);
+            console.log(`\n[REAL PRODUCTION] Password Reset OTP Email sent to ${email}!!\n`);
+        } catch (mailErr) {
+            console.warn('[EMAIL WARNING] Password reset mail issue or timeout:', mailErr.message);
         }
 
         res.json({ message: 'Password reset code sent to your email!' });

@@ -44,103 +44,74 @@
             </header>
 
             <!-- STAT CARDS -->
-            <div class="dashboard-stats"
-                style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 25px; margin-bottom: 40px;">
-
-                <div class="stat-card glass-panel card-hover"
-                    style="padding: 25px; display:flex; align-items:center; gap:20px;">
-                    <div
-                        style="width:50px; height:50px; border-radius:12px; background:rgba(59,130,246,0.1); color:#3b82f6; display:flex; align-items:center; justify-content:center; font-size:24px;">
+            <!-- STAT CARDS -->
+            <div class="dashboard-stats">
+                <div class="stat-card glass-panel card-hover">
+                    <div class="stat-icon-wrap" style="background:rgba(59,130,246,0.1); color:#3b82f6;">
                         <i class="ri-group-line"></i>
                     </div>
-                    <div>
-                        <div
-                            style="font-size:13px; color:var(--text-muted); font-weight:700; letter-spacing:1px; text-transform:uppercase;">
-                            Total Operators</div>
-                        <div class="val" id="totalUsersCount"
-                            style="font-size:32px; font-weight:800; font-family:'Outfit';">0</div>
+                    <div class="stat-meta">
+                        <div class="stat-lbl">Total Operators</div>
+                        <div class="val" id="totalUsersCount">0</div>
                     </div>
                 </div>
 
-                <div class="stat-card glass-panel card-hover"
-                    style="padding: 25px; display:flex; align-items:center; gap:20px;">
-                    <div
-                        style="width:50px; height:50px; border-radius:12px; background:rgba(16,185,129,0.1); color:#10b981; display:flex; align-items:center; justify-content:center; font-size:24px;">
+                <div class="stat-card glass-panel card-hover">
+                    <div class="stat-icon-wrap" style="background:rgba(16,185,129,0.1); color:#10b981;">
                         <i class="ri-user-follow-line"></i>
                     </div>
-                    <div>
-                        <div
-                            style="font-size:13px; color:var(--text-muted); font-weight:700; letter-spacing:1px; text-transform:uppercase;">
-                            Active Fleet</div>
-                        <div class="val" id="activeUsersCount"
-                            style="font-size:32px; font-weight:800; font-family:'Outfit';">0</div>
+                    <div class="stat-meta">
+                        <div class="stat-lbl">Active Fleet</div>
+                        <div class="val" id="activeUsersCount">0</div>
                     </div>
                 </div>
 
-                <div class="stat-card glass-panel card-hover"
-                    style="padding: 25px; display:flex; align-items:center; gap:20px;">
-                    <div
-                        style="width:50px; height:50px; border-radius:12px; background:rgba(2fb960,0.1); color:#fb923c; display:flex; align-items:center; justify-content:center; font-size:24px;">
+                <div class="stat-card glass-panel card-hover">
+                    <div class="stat-icon-wrap" style="background:rgba(251,146,60,0.1); color:#fb923c;">
                         <i class="ri-pulse-line"></i>
                     </div>
-                    <div>
-                        <div
-                            style="font-size:13px; color:var(--text-muted); font-weight:700; letter-spacing:1px; text-transform:uppercase;">
-                            New Logins (24h)</div>
-                        <div class="val" id="recentLoginsCount"
-                            style="font-size:32px; font-weight:800; font-family:'Outfit';">0</div>
+                    <div class="stat-meta">
+                        <div class="stat-lbl">New Logins (24h)</div>
+                        <div class="val" id="recentLoginsCount">0</div>
                     </div>
                 </div>
 
-                <div class="stat-card glass-panel card-hover"
-                    style="padding: 25px; display:flex; align-items:center; gap:20px;">
-                    <div
-                        style="width:50px; height:50px; border-radius:12px; background:rgba(239,68,68,0.1); color:#ef4444; display:flex; align-items:center; justify-content:center; font-size:24px;">
+                <div class="stat-card glass-panel card-hover">
+                    <div class="stat-icon-wrap" style="background:rgba(239,68,68,0.1); color:#ef4444;">
                         <i class="ri-shield-user-line"></i>
                     </div>
-                    <div>
-                        <div
-                            style="font-size:13px; color:var(--text-muted); font-weight:700; letter-spacing:1px; text-transform:uppercase;">
-                            Suspended</div>
-                        <div class="val" id="suspendedUsersCount"
-                            style="font-size:32px; font-weight:800; font-family:'Outfit';">0</div>
+                    <div class="stat-meta">
+                        <div class="stat-lbl">Suspended</div>
+                        <div class="val" id="suspendedUsersCount">0</div>
                     </div>
                 </div>
             </div>
 
             <!-- CHART ROW -->
-            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 25px; margin-bottom: 40px;">
-                <div class="glass-panel" style="padding: 30px;">
-                    <h2
-                        style="font-size:18px; color:#fff; margin-bottom:20px; display:flex; justify-content:space-between;">
-                        <span><i class="ri-line-chart-line" style="color:var(--brand-secondary);"></i> Registration
-                            Matrix</span>
+            <div class="chart-row">
+                <div class="glass-panel chart-card" style="padding: 24px;">
+                    <h2 style="font-size:18px; color:#fff; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+                        <span><i class="ri-line-chart-line" style="color:var(--brand-secondary);"></i> Registration Matrix</span>
                     </h2>
-                    <div style="height: 300px; width:100%;">
+                    <div class="chart-container-wrap" style="height: 280px; width:100%;">
                         <canvas id="growthChart"></canvas>
                     </div>
                 </div>
                 <!-- SIDEBAR QUICK ACTIONS -->
-                <div class="glass-panel"
-                    style="padding: 30px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
-                    <i class="ri-checkbox-circle-fill"
-                        style="font-size:64px; color:#10b981; margin-bottom:15px; opacity:0.8;"></i>
-                    <h2 style="font-size:22px; color:#fff;">System Stable</h2>
-                    <p style="color:var(--text-muted); font-size:14px; margin-bottom:25px;">All routing nodes and
-                        operator credentials are encrypted and functioning normally.</p>
+                <div class="glass-panel status-card" style="padding: 24px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
+                    <i class="ri-checkbox-circle-fill" style="font-size:52px; color:#10b981; margin-bottom:12px; opacity:0.9;"></i>
+                    <h2 style="font-size:20px; color:#fff;">System Stable</h2>
+                    <p style="color:var(--text-muted); font-size:13px; margin-bottom:15px; line-height:1.5;">All routing nodes and operator credentials are encrypted and functioning normally.</p>
                 </div>
             </div>
 
             <!-- TABLE CONTAINER -->
-            <div class="table-container glass-panel" style="padding:30px;">
-                <div class="toolbar"
-                    style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
-                    <h2 style="font-size: 20px;"><i class="ri-folder-user-line"></i> Operator Directory</h2>
-                    <div class="input-group" style="margin:0; width: 350px; position:relative;">
-                        <i class="ri-search-line"
-                            style="position:absolute; left:15px; top:50%; transform:translateY(-50%); color:var(--text-muted);"></i>
-                        <input type="text" id="userSearch" placeholder="Search by name, email, or ID..."
-                            style="padding:12px 14px 12px 40px; background:rgba(0,0,0,0.5); border-radius:10px;">
+            <div class="table-container glass-panel">
+                <div class="toolbar">
+                    <h2 style="font-size: 19px;"><i class="ri-folder-user-line"></i> Operator Directory</h2>
+                    <div class="input-group search-box-wrap" style="margin:0; position:relative;">
+                        <i class="ri-search-line" style="position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--text-muted);"></i>
+                        <input type="text" id="userSearch" placeholder="Search operators..." style="padding:10px 14px 10px 38px; background:rgba(0,0,0,0.5); border-radius:10px; width:100%;">
                     </div>
                 </div>
 
