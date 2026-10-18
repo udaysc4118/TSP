@@ -12,11 +12,6 @@ const API_URL = (() => {
         return `http://${host}:5000/api`;
     }
 
-    // If served from Vercel or same origin where /api is hosted
-    if (host.includes('vercel.app')) {
-        return `${window.location.origin}/api`;
-    }
-
     return 'https://maharoute-ai-backend.onrender.com/api';
 })();
 
@@ -234,8 +229,8 @@ if (verifyOtpBtn) {
 
             sessionStorage.setItem("mfp_token", data.token);
             sessionStorage.setItem("mfp_user", JSON.stringify(data.user));
-            localStorage.removeItem("mfp_token");
-            localStorage.removeItem("mfp_user");
+            localStorage.setItem("mfp_token", data.token);
+            localStorage.setItem("mfp_user", JSON.stringify(data.user));
             window.location="index.html";
         } catch(e) {
             err.textContent="Server connection error";
@@ -277,10 +272,10 @@ if (submitLogin) {
 
             sessionStorage.setItem("mfp_token", data.token);
             sessionStorage.setItem("mfp_user", JSON.stringify(data.user));
-            localStorage.removeItem("mfp_token");
-            localStorage.removeItem("mfp_user");
+            localStorage.setItem("mfp_token", data.token);
+            localStorage.setItem("mfp_user", JSON.stringify(data.user));
             
-            if (data.user.role === 'admin') {
+            if (data.user && data.user.role === 'admin') {
                 window.location="admin.html";
             } else {
                 window.location="index.html";
@@ -331,8 +326,8 @@ if (adminForm) {
             if (data.token) {
                 sessionStorage.setItem("mfp_token", data.token);
                 sessionStorage.setItem("mfp_user", JSON.stringify({ id: email, name: 'System Admin', role: 'admin' }));
-                localStorage.removeItem("mfp_token");
-                localStorage.removeItem("mfp_user");
+                localStorage.setItem("mfp_token", data.token);
+                localStorage.setItem("mfp_user", JSON.stringify({ id: email, name: 'System Admin', role: 'admin' }));
                 window.location = "admin.html";
             }
         } catch(e) {
