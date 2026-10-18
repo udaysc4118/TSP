@@ -348,7 +348,7 @@ async function sendOtpEmail(email, otp) {
     if (!activeTransporter) throw new Error("Transporter not ready");
 
     let info = await activeTransporter.sendMail({
-        from: '"MahaRoute Security" <noreply@maharoute.ai>',
+        from: process.env.SMTP_USER ? `"MahaRoute Security" <${process.env.SMTP_USER}>` : '"MahaRoute Security" <noreply@maharoute.ai>',
         to: email,
         subject: `Your MahaRoute Verification Code: ${otp}`,
         html: `
@@ -624,7 +624,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         if (!activeTransporter) throw new Error("Transporter not ready");
 
         let info = await activeTransporter.sendMail({
-            from: '"MahaRoute Security" <noreply@maharoute.ai>',
+            from: process.env.SMTP_USER ? `"MahaRoute Security" <${process.env.SMTP_USER}>` : '"MahaRoute Security" <noreply@maharoute.ai>',
             to: email,
             subject: `Password Reset Code: ${otp}`,
             html: `
