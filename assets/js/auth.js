@@ -12,7 +12,7 @@ const API_URL = (() => {
         return `http://${host}:5000/api`;
     }
 
-    return `${window.location.origin}/api`;
+    return 'https://maharoute-ai-backend.onrender.com/api';
 })();
 
 const signupPanel = document.getElementById("signupPanel");

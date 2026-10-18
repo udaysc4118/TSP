@@ -6,7 +6,7 @@
         if ((host === 'localhost' || host === '127.0.0.1') && port && port !== '5000') {
             return `http://${host}:5000/api`;
         }
-        return `${window.location.origin}/api`;
+        return 'https://maharoute-ai-backend.onrender.com/api';
     })();
     const token = localStorage.getItem('mfp_token');
 
