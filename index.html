@@ -142,105 +142,143 @@
         </div>
     </section>
 
-    <!-- ═══ SECTION 2: ROUTE STRUCTURE + LOGISTICS BREAKDOWN ════════ -->
+    <!-- ═══ SECTION 2: DUAL BREAKDOWNS + HORIZONTAL ROUTE TOPOLOGIES ════════ -->
     <section class="analysis-split-section" id="analysisSplit" style="display:none;">
         <div class="analytics-inner">
             <div class="section-label-pill"><i class="ri-git-merge-line"></i> Route Analysis</div>
-            <h2 class="section-heading">Route Structure &amp; Breakdown</h2>
-            <p class="section-subheading">Architectural pathway topologies alongside segment-by-segment logistics intelligence.</p>
+            <h2 class="section-heading">Journey Sequence &amp; Logistics Breakdown</h2>
+            <p class="section-subheading">Turn-by-turn waypoint navigation alongside segment road metrics and architectural topology models.</p>
 
-            <div class="analysis-split-layout">
+            <!-- ROW 1: DUAL BREAKDOWNS (Side by Side) -->
+            <div class="dual-breakdown-grid">
 
-                <!-- LEFT: Route Structure SVGs -->
-                <div class="structure-side">
-                    <div id="svgContainer" class="svg-container-list">
-
-                        <!-- 1. GREEDY PATH -->
-                        <div class="svg-block card-hover"
-                            style="border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.03);">
-                            <div class="svg-block-header">
-                                <span style="font-weight:800; color:#10b981; font-size:18px; letter-spacing:0.5px;">1. Fastest Path Logic</span>
-                                <span class="badge badge-fast">⚡ Greedy Route</span>
-                            </div>
-                            <div class="svg-canvas-wrap" style="border-color: rgba(16,185,129,0.1);">
-                                <svg id="graphGreedy" width="100%" height="auto" style="display:block; min-height: 240px;">
-                                    <defs>
-                                        <marker id="arrowGreedy" markerWidth="10" markerHeight="10" refX="28" refY="4" orient="auto">
-                                            <polyline points="0,0 6,4 0,8" fill="none" stroke="#10b981" stroke-width="2" />
-                                        </marker>
-                                    </defs>
-                                </svg>
-                            </div>
+                <!-- LEFT: Step-by-Step Journey Roadmap (Kahan se Kahan jana hai) -->
+                <div class="breakdown-column">
+                    <div class="breakdown-card-header">
+                        <div class="breakdown-card-title">
+                            <i class="ri-navigation-line" style="color:var(--brand-secondary)"></i>
+                            <span>Step-by-Step Journey Sequence</span>
                         </div>
-
-                        <!-- 2. TOTAL PATH (BASE SEQUENCE) -->
-                        <div class="svg-block card-hover"
-                            style="border-color: rgba(148,163,184,0.3); background: rgba(148,163,184,0.03);">
-                            <div class="svg-block-header">
-                                <span style="font-weight:800; color:#94a3b8; font-size:18px; letter-spacing:0.5px;">2. Original Flow Layout</span>
-                                <span class="badge badge-normal">Base Sequence</span>
-                            </div>
-                            <div class="svg-canvas-wrap" style="border-color: rgba(148,163,184,0.1);">
-                                <svg id="graphTotal" width="100%" height="auto" style="display:block; min-height: 240px;">
-                                    <defs>
-                                        <marker id="arrowTotal" markerWidth="10" markerHeight="10" refX="28" refY="4" orient="auto">
-                                            <polyline points="0,0 6,4 0,8" fill="none" stroke="#94a3b8" stroke-width="2" />
-                                        </marker>
-                                    </defs>
-                                </svg>
-                            </div>
-                        </div>
-
-                        <!-- 3. OPTIMAL PATH -->
-                        <div class="svg-block block-optimal card-hover"
-                            style="border-color: rgba(251,146,60,0.3); background: rgba(251,146,60,0.06);">
-                            <div class="svg-block-header">
-                                <span style="font-weight:800; color:#fb923c; font-size:18px; letter-spacing:0.5px;">3. Recommended Baseline</span>
-                                <span class="badge badge-optimal">⭐ Optimal Matrix</span>
-                            </div>
-                            <div class="svg-canvas-wrap" style="border-color: rgba(251,146,60,0.1);">
-                                <svg id="graphOptimal" width="100%" height="auto" style="display:block; min-height: 240px;">
-                                    <defs>
-                                        <marker id="arrowOptimal" markerWidth="10" markerHeight="10" refX="28" refY="4" orient="auto">
-                                            <polyline points="0,0 6,4 0,8" fill="none" stroke="#fb923c" stroke-width="2" />
-                                        </marker>
-                                    </defs>
-                                </svg>
-                            </div>
-                        </div>
-
-                        <!-- 4. FINAL MASTER STRUCTURE -->
-                        <div class="svg-block block-final card-hover">
-                            <div style="position:absolute; top:0; left:0; width:100%; height:100%; background: linear-gradient(105deg, transparent 20%, rgba(255,255,255,0.03) 25%, transparent 30%); pointer-events:none;"></div>
-                            <div class="svg-block-header" style="position:relative; z-index:2;">
-                                <span style="font-weight:900; color:#60a5fa; font-size:22px; letter-spacing:1px; text-transform:uppercase;">4. Final Master Structure</span>
-                                <span class="badge" style="background: linear-gradient(to right, #2563eb, #3b82f6); color:#fff; border:none; padding:8px 18px; font-size:12px; box-shadow: 0 8px 18px rgba(37, 99, 235, 0.4);">🏆 Confirmed Setup</span>
-                            </div>
-                            <div class="svg-canvas-wrap" style="border-color: rgba(59,130,246,0.3); position:relative; z-index:2;">
-                                <svg id="graphFinal" width="100%" height="auto" style="display:block; min-height: 320px;">
-                                    <defs>
-                                        <marker id="arrowFinal" markerWidth="10" markerHeight="10" refX="28" refY="4" orient="auto">
-                                            <polyline points="0,0 6,4 0,8" fill="none" stroke="#60a5fa" stroke-width="2" />
-                                        </marker>
-                                    </defs>
-                                </svg>
-                            </div>
-                        </div>
+                        <span class="badge" style="background:rgba(251,146,60,0.15); color:var(--brand-secondary); border:1px solid rgba(251,146,60,0.3);">
+                            <i class="ri-compass-3-line"></i> Turn Roadmap
+                        </span>
+                    </div>
+                    <p class="breakdown-card-sub">Exact chronological route sequence showing departure, waypoints, progression, and arrival.</p>
+                    <div id="journeySequenceContainer">
+                        <!-- Javascript will inject high-fidelity roadmap cards here -->
                     </div>
                 </div>
 
-                <!-- RIGHT: Logistics Breakdown -->
-                <div class="breakdown-side">
-                    <h2 class="section-heading" style="color:#fff;">
-                        <i class="ri-article-line" style="color:var(--brand-primary)"></i> Logistics Breakdown
-                    </h2>
-                    <p class="section-subheading">Compact, segment-by-segment intelligence for the selected route.</p>
+                <!-- RIGHT: Segment-by-Segment Logistics Breakdown -->
+                <div class="breakdown-column">
+                    <div class="breakdown-card-header">
+                        <div class="breakdown-card-title">
+                            <i class="ri-article-line" style="color:var(--brand-primary)"></i>
+                            <span>Segment Logistics Breakdown</span>
+                        </div>
+                        <span class="badge" style="background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);">
+                            <i class="ri-dashboard-line"></i> Road Metrics
+                        </span>
+                    </div>
+                    <p class="breakdown-card-sub">Detailed road transit data, duration, and road coordinates for each segment.</p>
                     <div id="breakdownContainer">
                         <!-- Javascript will inject high-fidelity compact cards here -->
                     </div>
                 </div>
 
             </div>
+
+            <!-- ROW 2: HORIZONTAL SCROLLING ROUTE STRUCTURE (Below Breakdowns) -->
+            <div class="route-topology-section" id="routeTopologySection">
+                <div class="topology-header-row">
+                    <div>
+                        <h3 class="topology-title">
+                            <i class="ri-git-commit-line" style="color:var(--brand-primary)"></i> Comparative Route Topologies
+                        </h3>
+                        <p class="topology-sub">Horizontal comparative models — swipe or scroll left/right to compare mathematical structures.</p>
+                    </div>
+                    <div class="carousel-nav-controls">
+                        <span class="carousel-scroll-hint"><i class="ri-drag-move-line"></i> Scroll horizontally</span>
+                        <button type="button" class="carousel-btn" id="scrollTopologyLeft" title="Scroll Left"><i class="ri-arrow-left-s-line"></i></button>
+                        <button type="button" class="carousel-btn" id="scrollTopologyRight" title="Scroll Right"><i class="ri-arrow-right-s-line"></i></button>
+                    </div>
+                </div>
+
+                <!-- Horizontal Scroll Track -->
+                <div class="svg-horizontal-track" id="svgHorizontalTrack">
+
+                    <!-- 1. GREEDY PATH -->
+                    <div class="svg-block-card card-hover" style="border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.03);">
+                        <div class="svg-block-header">
+                            <span style="font-weight:800; color:#10b981; font-size:17px; letter-spacing:0.5px;">1. Fastest Path Logic</span>
+                            <span class="badge badge-fast">⚡ Greedy Route</span>
+                        </div>
+                        <div class="svg-canvas-wrap" style="border-color: rgba(16,185,129,0.1);">
+                            <svg id="graphGreedy" width="100%" height="auto" style="display:block; min-height: 280px;">
+                                <defs>
+                                    <marker id="arrowGreedy" markerWidth="10" markerHeight="10" refX="28" refY="4" orient="auto">
+                                        <polyline points="0,0 6,4 0,8" fill="none" stroke="#10b981" stroke-width="2" />
+                                    </marker>
+                                </defs>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- 2. TOTAL PATH (BASE SEQUENCE) -->
+                    <div class="svg-block-card card-hover" style="border-color: rgba(148,163,184,0.3); background: rgba(148,163,184,0.03);">
+                        <div class="svg-block-header">
+                            <span style="font-weight:800; color:#94a3b8; font-size:17px; letter-spacing:0.5px;">2. Original Flow Layout</span>
+                            <span class="badge badge-normal">Base Sequence</span>
+                        </div>
+                        <div class="svg-canvas-wrap" style="border-color: rgba(148,163,184,0.1);">
+                            <svg id="graphTotal" width="100%" height="auto" style="display:block; min-height: 280px;">
+                                <defs>
+                                    <marker id="arrowTotal" markerWidth="10" markerHeight="10" refX="28" refY="4" orient="auto">
+                                        <polyline points="0,0 6,4 0,8" fill="none" stroke="#94a3b8" stroke-width="2" />
+                                    </marker>
+                                </defs>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- 3. OPTIMAL PATH -->
+                    <div class="svg-block-card block-optimal card-hover" style="border-color: rgba(251,146,60,0.3); background: rgba(251,146,60,0.06);">
+                        <div class="svg-block-header">
+                            <span style="font-weight:800; color:#fb923c; font-size:17px; letter-spacing:0.5px;">3. Recommended Baseline</span>
+                            <span class="badge badge-optimal">⭐ Optimal Matrix</span>
+                        </div>
+                        <div class="svg-canvas-wrap" style="border-color: rgba(251,146,60,0.1);">
+                            <svg id="graphOptimal" width="100%" height="auto" style="display:block; min-height: 280px;">
+                                <defs>
+                                    <marker id="arrowOptimal" markerWidth="10" markerHeight="10" refX="28" refY="4" orient="auto">
+                                        <polyline points="0,0 6,4 0,8" fill="none" stroke="#fb923c" stroke-width="2" />
+                                    </marker>
+                                </defs>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- 4. FINAL MASTER STRUCTURE -->
+                    <div class="svg-block-card block-final card-hover">
+                        <div style="position:absolute; top:0; left:0; width:100%; height:100%; background: linear-gradient(105deg, transparent 20%, rgba(255,255,255,0.03) 25%, transparent 30%); pointer-events:none;"></div>
+                        <div class="svg-block-header" style="position:relative; z-index:2;">
+                            <span style="font-weight:900; color:#60a5fa; font-size:18px; letter-spacing:0.5px; text-transform:uppercase;">4. Final Master Structure</span>
+                            <span class="badge" style="background: linear-gradient(to right, #2563eb, #3b82f6); color:#fff; border:none; padding:6px 14px; font-size:11px; box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);">🏆 Confirmed Setup</span>
+                        </div>
+                        <div class="svg-canvas-wrap" style="border-color: rgba(59,130,246,0.3); position:relative; z-index:2;">
+                            <svg id="graphFinal" width="100%" height="auto" style="display:block; min-height: 280px;">
+                                <defs>
+                                    <marker id="arrowFinal" markerWidth="10" markerHeight="10" refX="28" refY="4" orient="auto">
+                                        <polyline points="0,0 6,4 0,8" fill="none" stroke="#60a5fa" stroke-width="2" />
+                                    </marker>
+                                </defs>
+                            </svg>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
         </div>
     </section>
 

@@ -144,6 +144,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         addCity(); addCity();
+
+        // Horizontal Route Topology Carousel Scroll Controls
+        const track = document.getElementById('svgHorizontalTrack');
+        const leftBtn = document.getElementById('scrollTopologyLeft');
+        const rightBtn = document.getElementById('scrollTopologyRight');
+        if (leftBtn && track) {
+            leftBtn.onclick = () => track.scrollBy({ left: -480, behavior: 'smooth' });
+        }
+        if (rightBtn && track) {
+            rightBtn.onclick = () => track.scrollBy({ left: 480, behavior: 'smooth' });
+        }
     } catch(e) {
         let errDisplay = document.getElementById('errorDisplay');
         if(errDisplay) errDisplay.innerHTML = '⚠️ Map core error: ' + (e.message || e);
@@ -483,8 +494,6 @@ function drawSVGGraph(svgId, path, names, m) {
     let svg = document.getElementById(svgId);
     if(!svg) return;
     
-    document.getElementById('svgContainer').style.display = 'block';
-    
     // Attempt to salvage the pre-existing marker if it isn't dynamically built
     let defs = svg.querySelector('defs');
     svg.innerHTML = '';
@@ -493,15 +502,15 @@ function drawSVGGraph(svgId, path, names, m) {
     }
     
     // Create perfectly matched geometric color mapping
-    let clr = svgId==='graphOptimal' ? "#fb923c" : svgId==='graphGreedy' ? "#10b981" : svgId==='graphTotal' ? "#94a3b8" : "#3b82f6";
+    let clr = svgId==='graphOptimal' ? "#fb923c" : svgId==='graphGreedy' ? "#10b981" : svgId==='graphTotal' ? "#94a3b8" : "#60a5fa";
 
-    // Setup arrow marker dynamically so colors strictly pair identically!
+    // Setup arrow marker dynamically
     let markerId = "arrow-" + svgId;
     let marker = document.createElementNS("http://www.w3.org/2000/svg","marker");
     marker.setAttribute("id", markerId);
     marker.setAttribute("markerWidth", "12");
     marker.setAttribute("markerHeight", "12");
-    marker.setAttribute("refX", "34"); // Push arrow exactly behind radius 28!
+    marker.setAttribute("refX", "30");
     marker.setAttribute("refY", "6");
     marker.setAttribute("orient", "auto");
     
@@ -516,92 +525,126 @@ function drawSVGGraph(svgId, path, names, m) {
     svg.appendChild(defs);
 
     let n = path.length;
-    let cols = Math.ceil(Math.sqrt(n));
-    if (cols < 2 && n > 1) cols = 2; // Keep at least 2 columns forming for grid shapes
-    
-    let cellW = 220; 
-    let cellH = 140; 
-    
-    let positions = [];
-    let maxX = 0; let maxY = 0;
-    
-    for(let i=0; i<n; i++) {
-        let col = i % cols;
-        let row = Math.floor(i / cols);
-        let x = col * cellW;
-        let y = row * cellH;
-        positions.push([x, y]);
-        
-        if (x > maxX) maxX = x;
-        if (y > maxY) maxY = y;
+    let uniqueNodes = [...new Set(path)];
+    let numUnique = uniqueNodes.length;
+
+    // Viewport coordinates with generous margins so city labels never crop
+    const vbWidth = 560;
+    const vbHeight = 360;
+    const cx = vbWidth / 2;
+    const cy = vbHeight / 2;
+    const rx = 180;
+    const ry = 110;
+
+    // Position each unique city on an ellipse so edges and labels never bunch up
+    let positions = {};
+    for (let i = 0; i < numUnique; i++) {
+        let nodeIdx = uniqueNodes[i];
+        let angle = (i / numUnique) * 2 * Math.PI - Math.PI / 2;
+        let x = cx + rx * Math.cos(angle);
+        let y = cy + ry * Math.sin(angle);
+        positions[nodeIdx] = { x, y, angle };
     }
 
-    // Set an ultra-tight bounding box so viewport naturally scales geometric coordinates up!
-    let padX = 140; 
-    let padY = 120;
-    svg.setAttribute("viewBox", `-70 -50 ${maxX + padX} ${maxY + padY}`);
+    svg.setAttribute("viewBox", `0 0 ${vbWidth} ${vbHeight}`);
     svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
 
+    // 1. Draw connecting lines with arrow markers & distance pills
     for(let i=0; i<path.length-1; i++) {
         let f = positions[path[i]];
         let t = positions[path[i+1]];
         if(!f || !t) continue;
         
         let line = document.createElementNS("http://www.w3.org/2000/svg","line");
-        line.setAttribute("x1",f[0]); line.setAttribute("y1",f[1]);
-        line.setAttribute("x2",t[0]); line.setAttribute("y2",t[1]);
+        line.setAttribute("x1", f.x); line.setAttribute("y1", f.y);
+        line.setAttribute("x2", t.x); line.setAttribute("y2", t.y);
         line.setAttribute("stroke", clr);
-        line.setAttribute("stroke-width", "4");
+        line.setAttribute("stroke-width", "3.5");
         line.setAttribute("stroke-linecap", "round");
         line.setAttribute("marker-end", `url(#${markerId})`);
         svg.appendChild(line);
 
+        // Distance label with pill background
+        let midX = (f.x + t.x) / 2;
+        let midY = (f.y + t.y) / 2;
+        let distKm = m[path[i]][path[i+1]].toFixed(1) + " km";
+
+        // Label pill background
+        let pillBg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        pillBg.setAttribute("x", midX - 32);
+        pillBg.setAttribute("y", midY - 14);
+        pillBg.setAttribute("width", "64");
+        pillBg.setAttribute("height", "18");
+        pillBg.setAttribute("rx", "6");
+        pillBg.setAttribute("fill", "#050914");
+        pillBg.setAttribute("stroke", "rgba(255,255,255,0.15)");
+        pillBg.setAttribute("stroke-width", "1");
+        svg.appendChild(pillBg);
+
         let lbl = document.createElementNS("http://www.w3.org/2000/svg","text");
-        lbl.setAttribute("x",(f[0]+t[0])/2); 
-        lbl.setAttribute("y",(f[1]+t[1])/2 - 16);
+        lbl.setAttribute("x", midX); 
+        lbl.setAttribute("y", midY - 1);
         lbl.setAttribute("fill", "#cbd5e1");
-        lbl.setAttribute("font-size", "16");
-        lbl.setAttribute("font-weight", "600");
-        lbl.setAttribute("font-family", "'Outfit'");
+        lbl.setAttribute("font-size", "11");
+        lbl.setAttribute("font-weight", "700");
+        lbl.setAttribute("font-family", "'Outfit', sans-serif");
         lbl.setAttribute("text-anchor", "middle");
-        lbl.textContent = m[path[i]][path[i+1]].toFixed(1)+" km";
+        lbl.textContent = distKm;
         svg.appendChild(lbl);
     }
 
+    // 2. Draw nodes (circles + step number) & outward radial labels
     for(let i=0; i<path.length; i++) {
-        let p = positions[path[i]];
+        let nodeIdx = path[i];
+        let p = positions[nodeIdx];
         if(!p) continue;
         
+        // Only draw node circle once per unique city
+        if (svg.querySelector(`circle[data-node="${nodeIdx}"]`)) continue;
+
         let circ = document.createElementNS("http://www.w3.org/2000/svg","circle");
-        circ.setAttribute("cx", p[0]); 
-        circ.setAttribute("cy", p[1]); 
-        circ.setAttribute("r", "28");
-        circ.setAttribute("fill", "#121826");
+        circ.setAttribute("cx", p.x); 
+        circ.setAttribute("cy", p.y); 
+        circ.setAttribute("r", "22");
+        circ.setAttribute("fill", "#0d1322");
         circ.setAttribute("stroke", clr);
-        circ.setAttribute("stroke-width", "4");
+        circ.setAttribute("stroke-width", "3.5");
+        circ.setAttribute("data-node", nodeIdx);
         svg.appendChild(circ);
 
-        let txt = document.createElementNS("http://www.w3.org/2000/svg","text");
-        txt.setAttribute("x", p[0]); 
-        txt.setAttribute("y", p[1] + 55);
-        txt.setAttribute("fill", "#f8fafc"); 
-        txt.setAttribute("font-family", "'Outfit'");
-        txt.setAttribute("font-size", "18"); 
-        txt.setAttribute("font-weight", "800");
-        txt.setAttribute("text-anchor", "middle");
-        txt.textContent = names[path[i]];
-        svg.appendChild(txt);
-
+        // Step number inside circle
         let step = document.createElementNS("http://www.w3.org/2000/svg","text");
-        step.setAttribute("x", p[0]); 
-        step.setAttribute("y", p[1] + 6); // Centered mathematically inside circle radius
+        step.setAttribute("x", p.x); 
+        step.setAttribute("y", p.y + 5);
         step.setAttribute("fill", "#ffffff"); 
-        step.setAttribute("font-size", "18");
-        step.setAttribute("font-family", "'Inter'");
+        step.setAttribute("font-size", "14");
+        step.setAttribute("font-family", "'Outfit', sans-serif");
         step.setAttribute("font-weight", "800"); 
         step.setAttribute("text-anchor", "middle");
-        step.textContent = i+1;
+        step.textContent = i + 1;
         svg.appendChild(step);
+
+        // City name placed radially outside the circle with stroke background
+        let textDist = 34;
+        let lx = p.x + textDist * Math.cos(p.angle);
+        let ly = p.y + textDist * Math.sin(p.angle) + 4;
+        let anchor = "middle";
+        if (Math.cos(p.angle) > 0.3) anchor = "start";
+        else if (Math.cos(p.angle) < -0.3) anchor = "end";
+
+        let txt = document.createElementNS("http://www.w3.org/2000/svg","text");
+        txt.setAttribute("x", lx); 
+        txt.setAttribute("y", ly);
+        txt.setAttribute("fill", "#f8fafc"); 
+        txt.setAttribute("font-family", "'Outfit', sans-serif");
+        txt.setAttribute("font-size", "13"); 
+        txt.setAttribute("font-weight", "700");
+        txt.setAttribute("text-anchor", anchor);
+        txt.setAttribute("paint-order", "stroke fill");
+        txt.setAttribute("stroke", "#060911");
+        txt.setAttribute("stroke-width", "4px");
+        txt.textContent = names[nodeIdx];
+        svg.appendChild(txt);
     }
 }
 
@@ -616,9 +659,10 @@ function formatTime(mins) {
 // COMPACT BREAKDOWN GENERATOR CARD
 function renderBreakdown(segmentsData, names, totalDist, title, color, icon) {
     let container = document.getElementById("breakdownContainer");
+    if (!container) return;
     
     let html = `
-        <div class="route-card glass-panel" style="padding: 24px; border: 1px solid rgba(255,255,255,0.08);">
+        <div class="route-card glass-panel" style="padding: 24px; border: 1px solid rgba(255,255,255,0.08); border-radius: 18px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
                 <div>
                    <h3 style="font-size:18px; color:${color}; font-weight:700; display:flex; gap:8px; align-items:center;"><i class="${icon}"></i> ${title}</h3>
@@ -659,6 +703,94 @@ function renderBreakdown(segmentsData, names, totalDist, title, color, icon) {
             </div>
         </div>
     `;
+    container.innerHTML = html;
+}
+
+// ENHANCED STEP-BY-STEP JOURNEY ROADMAP (Kahan se Kahan jana hai)
+function renderJourneyRoadmap(segmentsData, names, totalDist, title, color, finalPathLogic) {
+    let container = document.getElementById("journeySequenceContainer");
+    if (!container) return;
+
+    let totalMins = segmentsData.reduce((acc, seg) => acc + (seg.duration || 0), 0);
+    let startCity = names[finalPathLogic[0]];
+
+    let html = `
+        <div class="journey-timeline-card">
+            <!-- Summary Stats -->
+            <div class="journey-summary-bar">
+                <div class="journey-summary-item">
+                    <span class="journey-summary-label">Route Origin</span>
+                    <span class="journey-summary-val" style="color:#10b981; font-size:14px;"><i class="ri-map-pin-2-fill"></i> ${startCity}</span>
+                </div>
+                <div class="journey-summary-item">
+                    <span class="journey-summary-label">Total Distance</span>
+                    <span class="journey-summary-val" style="color:${color}; font-size:15px;">${totalDist.toFixed(1)} km</span>
+                </div>
+                <div class="journey-summary-item">
+                    <span class="journey-summary-label">Est. Drive Time</span>
+                    <span class="journey-summary-val" style="font-size:14px;"><i class="ri-time-line"></i> ${formatTime(totalMins)}</span>
+                </div>
+            </div>
+
+            <!-- Vertical Timeline -->
+            <div class="journey-timeline-list">
+    `;
+
+    let accumulatedKm = 0;
+    for (let i = 0; i < finalPathLogic.length; i++) {
+        let cityIdx = finalPathLogic[i];
+        let cityName = names[cityIdx];
+        let isStart = i === 0;
+        let isEnd = i === finalPathLogic.length - 1;
+
+        let markerClass = isStart ? "marker-start" : (isEnd ? "marker-end" : "marker-mid");
+        let markerIcon = isStart ? '<i class="ri-flag-2-fill"></i>' : (isEnd ? '<i class="ri-trophy-fill"></i>' : i + 1);
+        let badgeStyle = isStart 
+            ? 'background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3);'
+            : (isEnd 
+                ? 'background:rgba(59,130,246,0.15); color:#60a5fa; border:1px solid rgba(59,130,246,0.3);'
+                : 'background:rgba(251,146,60,0.12); color:#fb923c; border:1px solid rgba(251,146,60,0.25);');
+        let badgeText = isStart ? 'Start Origin' : (isEnd ? 'Final Arrival' : `Waypoint #${i+1}`);
+
+        // Segment to next stop
+        let legInfo = '';
+        if (i < segmentsData.length) {
+            let seg = segmentsData[i];
+            accumulatedKm += seg.distance;
+            legInfo = `
+                <div style="margin-top:8px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.06); display:flex; justify-content:space-between; align-items:center; font-size:12px;">
+                    <span class="timeline-leg-indicator">
+                        <i class="ri-arrow-down-line"></i> Next: <strong>${seg.distance.toFixed(1)} km</strong>
+                    </span>
+                    <span style="color:#94a3b8;"><i class="ri-car-line"></i> ~${formatTime(seg.duration)}</span>
+                </div>
+            `;
+        }
+
+        html += `
+            <div class="timeline-step">
+                <div class="timeline-marker ${markerClass}">
+                    ${markerIcon}
+                </div>
+                <div class="timeline-content">
+                    <div class="timeline-city-row">
+                        <span class="timeline-city-name">${cityName}</span>
+                        <span class="timeline-badge" style="${badgeStyle}">${badgeText}</span>
+                    </div>
+                    <div class="timeline-meta">
+                        <span><i class="ri-route-line"></i> Route Progression: ${accumulatedKm.toFixed(1)} km</span>
+                    </div>
+                    ${legInfo}
+                </div>
+            </div>
+        `;
+    }
+
+    html += `
+            </div>
+        </div>
+    `;
+
     container.innerHTML = html;
 }
 
@@ -776,6 +908,7 @@ async function run() {
     else { dataToUse = r3.segmentsData; colorToUse = '#fb923c'; iconToUse = 'ri-copper-diamond-line'; }
 
     renderBreakdown(dataToUse, names, best, bestName, colorToUse, iconToUse);
+    renderJourneyRoadmap(dataToUse, names, best, bestName, colorToUse, finalPathLogic);
 
     // Show "Results" tab on mobile once analysis is ready
     const tabAnalysisBtn = document.getElementById('tabAnalysisBtn');

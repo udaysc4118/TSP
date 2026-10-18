@@ -779,33 +779,328 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
     border-top: 1px solid rgba(255,255,255,0.05);
 }
 
-.analysis-split-layout {
-    max-width: 1450px;
-    margin: 0 auto;
+/* ── Dual Breakdown Grid (Journey Sequence + Logistics Metrics) ── */
+.dual-breakdown-grid {
     display: grid;
-    grid-template-columns: 1.35fr 1fr;
-    gap: 50px;
-    align-items: start;
-}
-
-.svg-container-list {
-    display: flex;
-    flex-direction: column;
+    grid-template-columns: 1.15fr 1fr;
     gap: 32px;
-    padding-right: 20px;
+    align-items: start;
+    margin-bottom: 50px;
 }
 
-.svg-block {
-    background: rgba(0,0,0,0.4);
-    padding: 28px;
-    border-radius: 20px;
-    border: 1px solid rgba(255,255,255,0.06);
-    box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+.breakdown-column {
     display: flex;
     flex-direction: column;
-    transition: all 0.35s var(--ease-out);
+}
+
+.breakdown-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.breakdown-card-title {
+    font-size: 20px;
+    font-weight: 800;
+    font-family: 'Outfit', sans-serif;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.breakdown-card-sub {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+/* ── Journey Sequence Timeline Card ── */
+.journey-timeline-card {
+    background: rgba(13, 18, 32, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    padding: 24px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+}
+
+.journey-summary-bar {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 24px;
+}
+
+.journey-summary-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.journey-summary-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.journey-summary-val {
+    font-size: 16px;
+    font-weight: 800;
+    font-family: 'Outfit', sans-serif;
+    color: #fff;
+}
+
+.journey-timeline-list {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    padding-left: 6px;
+}
+
+.timeline-step {
+    display: flex;
+    gap: 16px;
+    position: relative;
+    padding-bottom: 22px;
+}
+
+.timeline-step:last-child {
+    padding-bottom: 0;
+}
+
+.timeline-step::before {
+    content: '';
+    position: absolute;
+    left: 17px;
+    top: 36px;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(180deg, rgba(251, 146, 60, 0.6) 0%, rgba(59, 130, 246, 0.3) 100%);
+}
+
+.timeline-step:last-child::before {
+    display: none;
+}
+
+.timeline-marker {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 800;
+    font-family: 'Outfit', sans-serif;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 2;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.6);
+}
+
+.marker-start {
+    background: #10b981;
+    color: #fff;
+    box-shadow: 0 0 16px rgba(16, 185, 129, 0.5);
+}
+
+.marker-mid {
+    background: #1e293b;
+    border: 2px solid #fb923c;
+    color: #fb923c;
+}
+
+.marker-end {
+    background: linear-gradient(135deg, #2563eb, #60a5fa);
+    color: #fff;
+    box-shadow: 0 0 18px rgba(37, 99, 235, 0.5);
+}
+
+.timeline-content {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 12px 16px;
+    transition: all 0.25s var(--ease-out);
+}
+
+.timeline-content:hover {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(251, 146, 60, 0.25);
+    transform: translateX(3px);
+}
+
+.timeline-city-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.timeline-city-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    font-family: 'Outfit', sans-serif;
+}
+
+.timeline-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.timeline-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.timeline-leg-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--brand-secondary);
+    font-weight: 600;
+}
+
+/* ── Route Topology Horizontal Carousel Track ── */
+.route-topology-section {
+    margin-top: 40px;
+    padding-top: 36px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.topology-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.topology-title {
+    font-size: 22px;
+    font-weight: 800;
+    font-family: 'Outfit', sans-serif;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.topology-sub {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.carousel-nav-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.carousel-scroll-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-right: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.carousel-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    transition: all 0.25s var(--ease-out);
+}
+
+.carousel-btn:hover {
+    background: rgba(251, 146, 60, 0.15);
+    border-color: rgba(251, 146, 60, 0.4);
+    color: #fb923c;
+    transform: translateY(-2px);
+}
+
+.svg-horizontal-track {
+    display: flex;
+    gap: 24px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 18px;
+    padding-top: 6px;
+}
+
+.svg-horizontal-track::-webkit-scrollbar {
+    height: 8px;
+}
+
+.svg-horizontal-track::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+}
+
+.svg-horizontal-track::-webkit-scrollbar-thumb {
+    background: rgba(251, 146, 60, 0.3);
+    border-radius: 8px;
+}
+
+.svg-horizontal-track::-webkit-scrollbar-thumb:hover {
+    background: rgba(251, 146, 60, 0.6);
+}
+
+.svg-block-card {
+    flex: 0 0 min(540px, 88vw);
+    scroll-snap-align: start;
+    background: rgba(10, 14, 24, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 20px;
+    padding: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
     position: relative;
     overflow: hidden;
+    transition: all 0.3s var(--ease-out);
+    box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+}
+
+.svg-block-card:hover {
+    border-color: var(--border-hover);
+    box-shadow: 0 20px 45px rgba(0,0,0,0.6);
 }
 
 .svg-block-header {
@@ -820,11 +1115,10 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
     margin-top: 18px;
     background: rgba(0,0,0,0.5);
     border-radius: 16px;
-    padding: 20px;
+    padding: 16px;
     text-align: center;
     border: 1px solid rgba(255,255,255,0.05);
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow: hidden;
 }
 
 .block-final {
@@ -965,18 +1259,14 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
         display: none !important;
     }
 
-    .analysis-split-layout {
+    .dual-breakdown-grid {
         grid-template-columns: 1fr;
-        gap: 35px;
+        gap: 32px;
     }
 
-    .breakdown-side {
-        position: static !important;
-    }
-
-    .svg-container-list {
-        padding-right: 0;
-        gap: 24px;
+    .svg-block-card {
+        flex: 0 0 88vw;
+        padding: 18px !important;
     }
 
     .analysis-split-section,
