@@ -10,35 +10,52 @@ const API_URL = (() => {
     return 'https://maharoute-ai-backend.onrender.com/api';
 })();
 
-const token = localStorage.getItem("mfp_token");
-const userStr = localStorage.getItem("mfp_user");
+const token = sessionStorage.getItem("mfp_token") || localStorage.getItem("mfp_token");
+const userStr = sessionStorage.getItem("mfp_user") || localStorage.getItem("mfp_user");
+
+function isTokenValid(tokenStr) {
+    if (!tokenStr) return false;
+    try {
+        const parts = tokenStr.split('.');
+        if (parts.length !== 3) return false;
+        const payload = JSON.parse(atob(parts[1]));
+        if (payload.exp && Date.now() >= payload.exp * 1000) return false;
+        return true;
+    } catch(e) {
+        return false;
+    }
+}
+
+function clearAdminAuthAndRedirect() {
+    sessionStorage.removeItem("mfp_token");
+    sessionStorage.removeItem("mfp_user");
+    localStorage.removeItem("mfp_token");
+    localStorage.removeItem("mfp_user");
+    window.location = "login.html";
+}
 
 // JWT Validation & Redirection Security
-if (!token || !userStr) {
-    window.location = "login.html";
+if (!token || !userStr || !isTokenValid(token)) {
+    clearAdminAuthAndRedirect();
 } else {
     try {
         const payload = JSON.parse(atob(token.split('.')[1]));
         if (payload.role !== 'admin') {
             alert("SECURITY: Authorized Personnel Only.\n\nYour standard token has been wiped. Please authenticate via the Admin Gateway.");
-            localStorage.removeItem("mfp_token");
-            localStorage.removeItem("mfp_user");
-            window.location = "login.html";
+            clearAdminAuthAndRedirect();
         } else {
             document.getElementById("commandCenter").style.display = "flex";
             fetchUsers();
         }
     } catch(e) {
-        window.location = "login.html";
+        clearAdminAuthAndRedirect();
     }
 }
 
 const logoutBtn = document.getElementById("logoutBtn");
 if (logoutBtn) {
     logoutBtn.onclick = () => {
-        localStorage.removeItem("mfp_token");
-        localStorage.removeItem("mfp_user");
-        window.location = "login.html";
+        clearAdminAuthAndRedirect();
     };
 }
 

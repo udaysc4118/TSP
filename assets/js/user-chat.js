@@ -8,7 +8,7 @@
         }
         return 'https://maharoute-ai-backend.onrender.com/api';
     })();
-    const token = localStorage.getItem('mfp_token');
+    const token = sessionStorage.getItem('mfp_token') || localStorage.getItem('mfp_token');
 
     const chatFab = document.getElementById('chatFab');
     const panel = document.getElementById('userChatPanel');

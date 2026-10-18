@@ -15,6 +15,13 @@ const API_URL = (() => {
     return 'https://maharoute-ai-backend.onrender.com/api';
 })();
 
+// Clear any stale credentials when arriving at login page
+sessionStorage.removeItem("mfp_token");
+sessionStorage.removeItem("mfp_user");
+localStorage.removeItem("mfp_token");
+localStorage.removeItem("mfp_user");
+
+
 const signupPanel = document.getElementById("signupPanel");
 const loginPanel = document.getElementById("loginPanel");
 
@@ -208,8 +215,10 @@ if (verifyOtpBtn) {
                 return;
             }
 
-            localStorage.setItem("mfp_token", data.token);
-            localStorage.setItem("mfp_user", JSON.stringify(data.user));
+            sessionStorage.setItem("mfp_token", data.token);
+            sessionStorage.setItem("mfp_user", JSON.stringify(data.user));
+            localStorage.removeItem("mfp_token");
+            localStorage.removeItem("mfp_user");
             window.location="index.html";
         } catch(e) {
             err.textContent="Server connection error";
@@ -249,8 +258,10 @@ if (submitLogin) {
                 return;
             }
 
-            localStorage.setItem("mfp_token", data.token);
-            localStorage.setItem("mfp_user", JSON.stringify(data.user));
+            sessionStorage.setItem("mfp_token", data.token);
+            sessionStorage.setItem("mfp_user", JSON.stringify(data.user));
+            localStorage.removeItem("mfp_token");
+            localStorage.removeItem("mfp_user");
             
             if (data.user.role === 'admin') {
                 window.location="admin.html";
@@ -301,9 +312,10 @@ if (adminForm) {
 
             // Trust the token explicitly for an admin!
             if (data.token) {
-                localStorage.setItem("mfp_token", data.token);
-                // Hardcode standard UI payload since endpoint only strictly issues token
-                localStorage.setItem("mfp_user", JSON.stringify({ id: email, name: 'System Admin', role: 'admin' }));
+                sessionStorage.setItem("mfp_token", data.token);
+                sessionStorage.setItem("mfp_user", JSON.stringify({ id: email, name: 'System Admin', role: 'admin' }));
+                localStorage.removeItem("mfp_token");
+                localStorage.removeItem("mfp_user");
                 window.location = "admin.html";
             }
         } catch(e) {

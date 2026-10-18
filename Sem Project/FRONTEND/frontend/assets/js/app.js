@@ -1,11 +1,32 @@
 // app.js
 
-// 1. JWT Authentication Check
-const token = localStorage.getItem("mfp_token");
-const userStr = localStorage.getItem("mfp_user");
+// 1. JWT Authentication Check (Session + LocalStorage fallback with Token Expiration Check)
+const token = sessionStorage.getItem("mfp_token") || localStorage.getItem("mfp_token");
+const userStr = sessionStorage.getItem("mfp_user") || localStorage.getItem("mfp_user");
 
-if (!token || !userStr) {
+function isTokenValid(tokenStr) {
+    if (!tokenStr) return false;
+    try {
+        const parts = tokenStr.split('.');
+        if (parts.length !== 3) return false;
+        const payload = JSON.parse(atob(parts[1]));
+        if (payload.exp && Date.now() >= payload.exp * 1000) return false;
+        return true;
+    } catch(e) {
+        return false;
+    }
+}
+
+function clearAuthAndRedirect() {
+    sessionStorage.removeItem("mfp_token");
+    sessionStorage.removeItem("mfp_user");
+    localStorage.removeItem("mfp_token");
+    localStorage.removeItem("mfp_user");
     window.location = "login.html";
+}
+
+if (!token || !userStr || !isTokenValid(token)) {
+    clearAuthAndRedirect();
 } else {
     try {
         const user = JSON.parse(userStr);
@@ -16,15 +37,15 @@ if (!token || !userStr) {
         if (payload.role === 'admin') {
             document.getElementById("adminLink").style.display = "inline-flex";
         }
-    } catch(e) {}
+    } catch(e) {
+        clearAuthAndRedirect();
+    }
 }
 
 const logoutBtn = document.getElementById("logoutBtn");
 if (logoutBtn) {
     logoutBtn.onclick = () => {
-        localStorage.removeItem("mfp_token");
-        localStorage.removeItem("mfp_user");
-        window.location = "login.html";
+        clearAuthAndRedirect();
     };
 }
 

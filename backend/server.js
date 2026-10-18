@@ -38,8 +38,13 @@ app.get('/api/health', (req, res) => {
     });
 });
 
+// Ensure default landing page is login.html
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'login.html'));
+});
+
 // Serve frontend static files
-app.use(express.static(path.join(__dirname, '..', 'frontend')));
+app.use(express.static(path.join(__dirname, '..')));
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
