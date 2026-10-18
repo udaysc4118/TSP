@@ -83,8 +83,55 @@ function clearMap() {
     let strct = document.getElementById('analysisSplit');
     if(strct) strct.style.display = 'none';
     let pnl = document.getElementById('analyticsHUD');
+    if(pnl) pnl.style.display = 'none';
     let errDisp = document.getElementById('errorDisplay');
     if(errDisp) errDisp.innerHTML = '';
+    // Hide Results tab on mobile
+    const tabAnalysisBtn = document.getElementById('tabAnalysisBtn');
+    if (tabAnalysisBtn) tabAnalysisBtn.style.display = 'none';
+    // Hide map info badge
+    const mapInfoBadge = document.getElementById('mapInfoBadge');
+    if (mapInfoBadge) mapInfoBadge.style.display = 'none';
+}
+
+// ── Mobile Tab Switcher ──
+function switchMobileTab(tab) {
+    const sidebar = document.getElementById('sidebarPanel');
+    const mapArea = document.getElementById('mapArea');
+    const analysisSplit = document.getElementById('analysisSplit');
+    const analyticsHUD = document.getElementById('analyticsHUD');
+    const mobileResultsAnchor = document.getElementById('mobileResultsAnchor');
+
+    const tabMap = document.getElementById('tabMapBtn');
+    const tabCtrl = document.getElementById('tabControlsBtn');
+    const tabAnalysis = document.getElementById('tabAnalysisBtn');
+
+    // Reset active
+    [tabMap, tabCtrl, tabAnalysis].forEach(b => b && b.classList.remove('active'));
+
+    if (tab === 'map') {
+        if (sidebar) sidebar.classList.add('mobile-hidden');
+        if (mapArea) mapArea.classList.remove('mobile-hidden');
+        if (tabMap) tabMap.classList.add('active');
+        // Invalidate map size after reveal
+        setTimeout(() => { if (map) map.invalidateSize(); }, 150);
+    } else if (tab === 'controls') {
+        if (mapArea) mapArea.classList.add('mobile-hidden');
+        if (sidebar) sidebar.classList.remove('mobile-hidden');
+        if (tabCtrl) tabCtrl.classList.add('active');
+    } else if (tab === 'analysis') {
+        // Show map area (hide sidebar), then scroll to results
+        if (sidebar) sidebar.classList.add('mobile-hidden');
+        if (mapArea) mapArea.classList.remove('mobile-hidden');
+        if (tabAnalysis) tabAnalysis.classList.add('active');
+        setTimeout(() => {
+            if (mobileResultsAnchor) {
+                mobileResultsAnchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else if (analysisSplit && analysisSplit.style.display !== 'none') {
+                analysisSplit.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 100);
+    }
 }
 
 function addCity() {
@@ -188,6 +235,10 @@ function updateSelects() {
     let names = [];
     validRows.forEach(row => { if(row.dataset.name) names.push(row.dataset.name); });
     
+    // Update hub count badge in mobile nav
+    const badge = document.getElementById('hubCountBadge');
+    if (badge) badge.textContent = validRows.length;
+
     let s = document.getElementById('start');
     let e = document.getElementById('end');
     if(!s || !e) return;
@@ -643,7 +694,29 @@ async function run() {
     else { dataToUse = r3.segmentsData; colorToUse = '#fb923c'; iconToUse = 'ri-copper-diamond-line'; }
 
     renderBreakdown(dataToUse, names, best, bestName, colorToUse, iconToUse);
-    
-    // Smooth scroll implicitly down
-    document.querySelector('.workspace-layout').scrollIntoView({ behavior: 'smooth' });
+
+    // Show "Results" tab on mobile once analysis is ready
+    const tabAnalysisBtn = document.getElementById('tabAnalysisBtn');
+    if (tabAnalysisBtn) tabAnalysisBtn.style.display = '';
+
+    // Show the map info badge briefly
+    const mapInfoBadge = document.getElementById('mapInfoBadge');
+    const mapInfoText = document.getElementById('mapInfoText');
+    if (mapInfoBadge && mapInfoText) {
+        mapInfoText.textContent = `✓ ${bestName} — ${best.toFixed(1)} km`;
+        mapInfoBadge.style.display = 'flex';
+        setTimeout(() => { mapInfoBadge.style.display = 'none'; }, 4000);
+    }
+
+    // On desktop: scroll to results smoothly
+    const isMobile = window.innerWidth <= 992;
+    if (!isMobile) {
+        document.getElementById('analysisSplit').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+        // On mobile: switch map back into view, then scroll to results section
+        switchMobileTab('map');
+        setTimeout(() => {
+            document.getElementById('mobileResultsAnchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 300);
+    }
 }

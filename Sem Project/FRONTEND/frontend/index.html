@@ -19,10 +19,25 @@
 
     <div class="workspace-layout">
 
+        <!-- Mobile View Navigation Bar (Only visible on mobile screens < 992px) -->
+        <nav class="mobile-nav-bar" id="mobileNavBar">
+            <button type="button" class="mobile-nav-btn active" id="tabMapBtn" onclick="switchMobileTab('map')">
+                <i class="ri-map-2-line"></i> <span>Live Map</span>
+            </button>
+            <button type="button" class="mobile-nav-btn" id="tabControlsBtn" onclick="switchMobileTab('controls')">
+                <i class="ri-dashboard-line"></i> <span>Mission Setup</span>
+                <span class="hub-count-pill" id="hubCountBadge">2</span>
+            </button>
+            <button type="button" class="mobile-nav-btn" id="tabAnalysisBtn" onclick="switchMobileTab('analysis')" style="display:none;">
+                <i class="ri-bar-chart-box-line"></i> <span>Telemetry</span>
+            </button>
+        </nav>
+
         <!-- Sidebar Command Center -->
-        <aside class="workspace-sidebar">
+        <aside class="workspace-sidebar" id="sidebarPanel">
             <div class="sidebar-header">
                 <div class="logo">
+                    <span class="status-indicator-dot" title="Engine Live"></span>
                     <i class="ri-route-line" style="color:var(--brand-primary)"></i> MahaRoute <span
                         style="font-weight:300;">Pro</span>
                 </div>
@@ -34,22 +49,22 @@
 
             <div class="sidebar-content">
                 <h3
-                    style="font-size:24px; margin-bottom:5px; font-family:'Outfit'; color:#fff; font-weight:800; letter-spacing:-0.5px;">
+                    style="font-size:22px; margin-bottom:5px; font-family:'Outfit'; color:#fff; font-weight:800; letter-spacing:-0.5px;">
                     Mission Control</h3>
-                <p style="font-size:14px; color:var(--text-muted); margin-bottom:30px;">Coordinate dynamic waypoints to
+                <p style="font-size:13px; color:var(--text-muted); margin-bottom:24px;">Coordinate dynamic waypoints to
                     compile optimized routing matrices.</p>
 
                 <div class="control-box glass-panel">
 
                     <label
-                        style="font-size:12px; font-weight:800; color:var(--text-muted); margin-bottom:12px; display:block; text-transform:uppercase; letter-spacing:1px;">City
+                        style="font-size:11px; font-weight:800; color:var(--text-muted); margin-bottom:12px; display:block; text-transform:uppercase; letter-spacing:1px;">City
                         Waypoints</label>
-                    <div id="inputs" style="display:flex; flex-direction:column; gap:12px; margin-bottom:25px;">
+                    <div id="inputs" style="display:flex; flex-direction:column; gap:10px; margin-bottom:20px;">
                         <!-- JS injected cities go here -->
                     </div>
 
                     <button class="btn btn-secondary action-btn" onclick="addCity()"
-                        style="width:100%; margin-bottom: 35px; border-style: dashed;">
+                        style="width:100%; margin-bottom: 24px; border-style: dashed;">
                         <i class="ri-add-line"></i> Add City Hub
                     </button>
 
@@ -68,15 +83,15 @@
                     </div>
 
                     <div id="errorDisplay"
-                        style="color:#fca5a5; font-size:14px; margin-bottom:15px; text-align:center; font-weight:500;">
+                        style="color:#fca5a5; font-size:13px; margin-bottom:12px; text-align:center; font-weight:500;">
                     </div>
 
                     <button class="btn btn-primary action-btn-glow" onclick="run()"
-                        style="width:100%; margin-top:15px; font-size:16px;">
+                        style="width:100%; margin-top:10px; font-size:15px;">
                         <i class="ri-rocket-line"></i> Optimize Route Sequence
                     </button>
                     <button class="btn btn-secondary action-btn" onclick="clearMap()"
-                        style="width:100%; margin-top:15px;">
+                        style="width:100%; margin-top:12px;">
                         <i class="ri-refresh-line"></i> Purge Active Logic
                     </button>
                 </div>
@@ -92,37 +107,36 @@
         </aside>
 
         <!-- Main Map Area -->
-        <main class="workspace-map">
+        <main class="workspace-map" id="mapArea">
             <div id="map"></div>
+            <button type="button" id="mobileQuickSetupBtn" class="mobile-floating-setup-btn" onclick="switchMobileTab('controls')">
+                <i class="ri-map-pin-add-line"></i> Configure Cities
+            </button>
         </main>
     </div>
 
     <!-- 1. ANALYSIS SPLIT SECTION: ROUTE STRUCTURE (Left) & BREAKDOWN (Right) -->
-    <section class="analysis-split-section" id="analysisSplit"
-        style="display:none; padding:100px 40px; background:radial-gradient(ellipse at top right, #101625, var(--bg-dark)); border-top:1px solid rgba(255,255,255,0.05);">
-        <div style="max-width:1450px; margin:0 auto;" class="analysis-split-layout">
+    <section class="analysis-split-section" id="analysisSplit" style="display:none;">
+        <div class="analysis-split-layout">
 
             <!-- LEFT: Route Structure -->
             <div class="structure-side">
                 <h2 class="section-heading"><i class="ri-git-merge-line" style="color:var(--brand-secondary)"></i> Route
                     Structure</h2>
-                <p class="section-subheading" style="margin-bottom:40px; max-width:100%;">Architectural pathway
-                    topologies mapped for precise visualization.</p>
+                <p class="section-subheading">Architectural pathway topologies mapped for precise visualization.</p>
 
-                <div id="svgContainer" style="display: flex; flex-direction: column; gap: 40px; padding-right: 40px;">
+                <div id="svgContainer" class="svg-container-list">
 
                     <!-- 1. GREEDY PATH -->
                     <div class="svg-block card-hover"
-                        style="border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.03); padding: 35px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                        style="border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.03);">
+                        <div class="svg-block-header">
                             <span style="font-weight:800; color:#10b981; font-size:18px; letter-spacing:0.5px;">1.
                                 Fastest Path Logic</span>
-                            <span class="badge badge-fast" style="font-size:13px; padding:6px 14px;">⚡ Greedy
-                                Route</span>
+                            <span class="badge badge-fast">⚡ Greedy Route</span>
                         </div>
-                        <div
-                            style="margin-top:20px; background:rgba(0,0,0,0.5); border-radius:18px; padding:25px; text-align:center; border: 1px solid rgba(16,185,129,0.1);">
-                            <svg id="graphGreedy" width="100%" height="auto" style="display:block; min-height: 280px;">
+                        <div class="svg-canvas-wrap" style="border-color: rgba(16,185,129,0.1);">
+                            <svg id="graphGreedy" width="100%" height="auto" style="display:block; min-height: 240px;">
                                 <defs>
                                     <marker id="arrowGreedy" markerWidth="10" markerHeight="10" refX="28" refY="4"
                                         orient="auto">
@@ -135,16 +149,14 @@
 
                     <!-- 2. TOTAL PATH (BASE SEQUENCE) -->
                     <div class="svg-block card-hover"
-                        style="border-color: rgba(148,163,184,0.3); background: rgba(148,163,184,0.03); padding: 35px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                        style="border-color: rgba(148,163,184,0.3); background: rgba(148,163,184,0.03);">
+                        <div class="svg-block-header">
                             <span style="font-weight:800; color:#94a3b8; font-size:18px; letter-spacing:0.5px;">2.
                                 Original Flow Layout</span>
-                            <span class="badge badge-normal" style="font-size:13px; padding:6px 14px;">Base
-                                Sequence</span>
+                            <span class="badge badge-normal">Base Sequence</span>
                         </div>
-                        <div
-                            style="margin-top:20px; background:rgba(0,0,0,0.5); border-radius:18px; padding:25px; text-align:center; border: 1px solid rgba(148,163,184,0.1);">
-                            <svg id="graphTotal" width="100%" height="auto" style="display:block; min-height: 280px;">
+                        <div class="svg-canvas-wrap" style="border-color: rgba(148,163,184,0.1);">
+                            <svg id="graphTotal" width="100%" height="auto" style="display:block; min-height: 240px;">
                                 <defs>
                                     <marker id="arrowTotal" markerWidth="10" markerHeight="10" refX="28" refY="4"
                                         orient="auto">
@@ -157,16 +169,14 @@
 
                     <!-- 3. OPTIMAL PATH -->
                     <div class="svg-block block-optimal card-hover"
-                        style="border-color: rgba(251,146,60,0.3); background: rgba(251,146,60,0.06); padding: 35px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                        style="border-color: rgba(251,146,60,0.3); background: rgba(251,146,60,0.06);">
+                        <div class="svg-block-header">
                             <span style="font-weight:800; color:#fb923c; font-size:18px; letter-spacing:0.5px;">3.
                                 Recommended Baseline</span>
-                            <span class="badge badge-optimal" style="font-size:13px; padding:6px 14px;">⭐ Optimal
-                                Matrix</span>
+                            <span class="badge badge-optimal">⭐ Optimal Matrix</span>
                         </div>
-                        <div
-                            style="margin-top:20px; background:rgba(0,0,0,0.5); border-radius:18px; padding:25px; text-align:center; border: 1px solid rgba(251,146,60,0.1);">
-                            <svg id="graphOptimal" width="100%" height="auto" style="display:block; min-height: 280px;">
+                        <div class="svg-canvas-wrap" style="border-color: rgba(251,146,60,0.1);">
+                            <svg id="graphOptimal" width="100%" height="auto" style="display:block; min-height: 240px;">
                                 <defs>
                                     <marker id="arrowOptimal" markerWidth="10" markerHeight="10" refX="28" refY="4"
                                         orient="auto">
@@ -178,26 +188,22 @@
                     </div>
 
                     <!-- 4. FINAL MASTER STRUCTURE -->
-                    <div class="svg-block block-final card-hover"
-                        style="position:relative; overflow:hidden; border: 2px solid rgba(59, 130, 246, 0.6); background: linear-gradient(135deg, rgba(8, 14, 25, 1) 0%, rgba(18, 32, 60, 0.4) 100%); padding: 50px; transform: scale(1.03); box-shadow: 0 40px 80px rgba(0,0,0,0.9), 0 0 40px rgba(59,130,246,0.15); margin-top:40px; border-radius: 24px;">
-
+                    <div class="svg-block block-final card-hover">
                         <!-- Decorative Glare Element for Premium Feel -->
                         <div
                             style="position:absolute; top:0; left:0; width:100%; height:100%; background: linear-gradient(105deg, transparent 20%, rgba(255,255,255,0.03) 25%, transparent 30%); pointer-events:none;">
                         </div>
 
-                        <div
-                            style="display:flex; justify-content:space-between; align-items:center; position:relative; z-index:2;">
+                        <div class="svg-block-header" style="position:relative; z-index:2;">
                             <span
-                                style="font-weight:900; color:#60a5fa; font-size:24px; letter-spacing:1.5px; text-transform:uppercase; text-shadow: 0 2px 10px rgba(0,0,0,0.5);">4.
+                                style="font-weight:900; color:#60a5fa; font-size:22px; letter-spacing:1px; text-transform:uppercase;">4.
                                 Final Master Structure</span>
                             <span class="badge"
-                                style="background: linear-gradient(to right, #2563eb, #3b82f6); color:#fff; border:none; padding:10px 22px; font-size:13px; box-shadow: 0 10px 20px rgba(37, 99, 235, 0.4); text-shadow: 0 1px 2px rgba(0,0,0,0.4);">🏆
+                                style="background: linear-gradient(to right, #2563eb, #3b82f6); color:#fff; border:none; padding:8px 18px; font-size:12px; box-shadow: 0 8px 18px rgba(37, 99, 235, 0.4);">🏆
                                 Confirmed Setup</span>
                         </div>
-                        <div
-                            style="margin-top:35px; background:rgba(0,0,0,0.6); border-radius:20px; padding:45px; text-align:center; border: 1px solid rgba(59,130,246,0.3); position:relative; z-index:2; backdrop-filter: blur(10px);">
-                            <svg id="graphFinal" width="100%" height="auto" style="display:block; min-height: 380px;">
+                        <div class="svg-canvas-wrap" style="border-color: rgba(59,130,246,0.3); position:relative; z-index:2;">
+                            <svg id="graphFinal" width="100%" height="auto" style="display:block; min-height: 320px;">
                                 <defs>
                                     <marker id="arrowFinal" markerWidth="10" markerHeight="10" refX="28" refY="4"
                                         orient="auto">
@@ -215,8 +221,7 @@
                 <h2 class="section-heading" style="color:#fff;">
                     <i class="ri-article-line" style="color:var(--brand-primary)"></i> Logistics Breakdown
                 </h2>
-                <p class="section-subheading" style="margin-bottom:40px; max-width:100%;">Compact, segment-by-segment
-                    intelligence mapping for the selected physical route.</p>
+                <p class="section-subheading">Compact, segment-by-segment intelligence mapping for the selected physical route.</p>
 
                 <div id="breakdownContainer">
                     <!-- Javascript will inject high-fidelity compact cards here -->
@@ -227,31 +232,26 @@
     </section>
 
     <!-- 2. ADVANCED ANALYTICS OVERVIEW -->
-    <section class="analytics-section" id="analyticsHUD"
-        style="display:none; padding:120px 40px; background: #060911; border-top: 1px solid rgba(255,255,255,0.03); min-height: 50vh; position:relative;">
-        <div
-            style="position:absolute; top:0; left:0; width:100%; height:1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);">
-        </div>
-
+    <section class="analytics-section" id="analyticsHUD" style="display:none;">
         <div style="max-width: 1450px; margin: 0 auto;">
             <h2 class="section-heading"><i class="ri-dashboard-3-line" style="color:var(--brand-primary)"></i> Advanced
                 Mission Telemetry</h2>
             <p class="section-subheading">A global data perspective factoring straight-line bounds and computational
                 matrix efficiency.</p>
 
-            <div
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 40px; margin-top:50px;">
-                <div id="prediction" class="analytics-card card-hover" style="height:100%;"></div>
-                <div id="compare" class="analytics-card card-hover" style="font-size:14px; height:100%;"></div>
+            <div class="analytics-grid">
+                <div id="prediction" class="analytics-card card-hover"></div>
+                <div id="compare" class="analytics-card card-hover"></div>
 
-                <div id="matrix-container" class="analytics-card card-hover"
-                    style="grid-column: 1 / -1; overflow-x:auto;">
+                <div id="matrix-container" class="analytics-card card-hover" style="grid-column: 1 / -1;">
                     <h3
-                        style="font-size:18px; margin-bottom:25px; color:#e2e8f0; font-family:'Outfit'; display:flex; gap:10px; align-items:center;">
+                        style="font-size:18px; margin-bottom:18px; color:#e2e8f0; font-family:'Outfit'; display:flex; gap:10px; align-items:center;">
                         <i class="ri-grid-fill" style="color:var(--brand-secondary)"></i> Baseline Distance Matrix
                         Computation (km)
                     </h3>
-                    <div id="matrix" style="width:100%;"></div>
+                    <div class="matrix-scroll-wrapper">
+                        <div id="matrix" style="width:100%;"></div>
+                    </div>
                 </div>
             </div>
         </div>
