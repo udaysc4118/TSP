@@ -725,29 +725,6 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
 /* ── Floating Quick Setup Button on Map (Mobile) ── */
 .mobile-floating-setup-btn {
     display: none;
-    position: absolute;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1000;
-    background: linear-gradient(135deg, #ea580c 0%, #fb923c 100%);
-    color: #fff;
-    font-weight: 700;
-    font-size: 14px;
-    font-family: 'Outfit', sans-serif;
-    padding: 12px 22px;
-    border-radius: 30px;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    box-shadow: 0 10px 30px rgba(234, 88, 12, 0.45);
-    cursor: pointer;
-    align-items: center;
-    gap: 8px;
-    white-space: nowrap;
-    transition: all 0.25s var(--ease-out);
-}
-.mobile-floating-setup-btn:hover {
-    transform: translateX(-50%) translateY(-2px);
-    box-shadow: 0 14px 35px rgba(234, 88, 12, 0.55);
 }
 
 /* ── Responsive Analysis & Telemetry Classes ── */
@@ -818,11 +795,55 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
     position: relative;
 }
 
+.analytics-inner {
+    max-width: 1450px;
+    margin: 0 auto;
+}
+
+.section-label-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: rgba(251,146,60,0.1);
+    border: 1px solid rgba(251,146,60,0.25);
+    color: var(--brand-secondary);
+    font-size: 11px;
+    font-weight: 800;
+    font-family: 'Inter', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    padding: 6px 14px;
+    border-radius: 30px;
+    margin-bottom: 18px;
+}
+
+.analytics-card-title {
+    font-size: 18px;
+    margin-bottom: 18px;
+    color: #e2e8f0;
+    font-family: 'Outfit', sans-serif;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    font-weight: 700;
+}
+
 .analytics-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
     gap: 28px;
     margin-top: 40px;
+}
+
+.structure-side {
+    min-width: 0;
+}
+
+.breakdown-side {
+    min-width: 0;
+    position: sticky;
+    top: 28px;
+    align-self: start;
 }
 
 .matrix-scroll-wrapper {
@@ -831,6 +852,26 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
     -webkit-overflow-scrolling: touch;
     border-radius: 12px;
     margin-top: 12px;
+}
+
+#matrix table tr:hover td {
+    background: rgba(251, 146, 60, 0.05);
+    color: #fff;
+}
+
+.analytics-card {
+    background: rgba(13, 18, 32, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 18px;
+    padding: 24px;
+    transition: all 0.3s var(--ease-out);
+}
+
+.analytics-card:hover {
+    border-color: rgba(251, 146, 60, 0.35);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4), 0 0 20px rgba(251, 146, 60, 0.08);
 }
 
 /* ── Responsive Breakpoints ── */
@@ -854,14 +895,10 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
     .workspace-sidebar::after { display: none; }
 
     .workspace-map {
-        height: calc(100vh - 125px);
-        min-height: 480px;
+        height: calc(100vh - 56px);
+        min-height: 400px;
         width: 100%;
         position: relative;
-    }
-
-    .mobile-floating-setup-btn {
-        display: inline-flex;
     }
 
     /* Mobile view toggling */
@@ -876,6 +913,10 @@ body { overflow-x: hidden; overflow-y: auto; background: var(--bg-dark); }
     .analysis-split-layout {
         grid-template-columns: 1fr;
         gap: 35px;
+    }
+
+    .breakdown-side {
+        position: static !important;
     }
 
     .svg-container-list {
