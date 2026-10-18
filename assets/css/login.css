@@ -297,15 +297,59 @@ body {
 }
 
 /* ── Responsive ── */
-@media (max-width: 1000px) {
-    .visual-sidebar { display: none; }
-    .split-screen { flex-direction: column; }
+@media (max-width: 900px) {
+    .split-screen {
+        flex-direction: column;
+        width: 100%;
+        min-height: 100vh;
+    }
     .auth-sidebar {
-        padding: 80px 24px;
-        max-width: 520px;
+        padding: 40px 20px 24px;
+        max-width: 100%;
+        width: 100%;
         margin: 0 auto;
+        order: 1;
         background: transparent;
     }
     .auth-sidebar::before { display: none; }
+    .auth-header {
+        margin-bottom: 24px;
+    }
+    .auth-header h1 {
+        font-size: 28px;
+    }
+    .visual-sidebar {
+        display: flex !important;
+        order: 2;
+        padding: 10px 20px 50px;
+        width: 100%;
+        border-left: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(4, 7, 15, 0.8);
+    }
+    .visual-card {
+        max-width: 100%;
+        padding: 14px;
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+    }
+    .featured-img {
+        width: 100%;
+        max-height: 240px;
+        object-fit: cover;
+        border-radius: 14px;
+    }
+    .visual-content-new {
+        padding: 12px 6px 4px;
+    }
+    .visual-content-new h2 {
+        font-size: 22px;
+        margin-bottom: 6px;
+    }
+    .visual-content-new p {
+        font-size: 13px;
+        padding: 0;
+        line-height: 1.5;
+    }
     .weather-widget { margin-top: 38px; }
 }
