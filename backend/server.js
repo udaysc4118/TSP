@@ -1,3 +1,8 @@
+const dns = require('dns');
+if (dns.setDefaultResultOrder) {
+    dns.setDefaultResultOrder('ipv4first');
+}
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -337,11 +342,14 @@ async function sendOtpEmail(email, otp) {
     let activeTransporter = transporter;
     if (process.env.SMTP_USER && process.env.SMTP_PASS) {
         activeTransporter = nodemailer.createTransport({
-            service: 'gmail', // or configured host
+            host: 'smtp.gmail.com',
+            port: 465,
+            secure: true,
             auth: {
                 user: process.env.SMTP_USER,
                 pass: process.env.SMTP_PASS
-            }
+            },
+            family: 4
         });
     }
 
@@ -617,8 +625,11 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         let activeTransporter = transporter;
         if (process.env.SMTP_USER && process.env.SMTP_PASS) {
             activeTransporter = nodemailer.createTransport({
-                service: 'gmail',
-                auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+                host: 'smtp.gmail.com',
+                port: 465,
+                secure: true,
+                auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+                family: 4
             });
         }
         if (!activeTransporter) throw new Error("Transporter not ready");
