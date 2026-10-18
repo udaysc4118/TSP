@@ -76,13 +76,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     try {
-        // High-Fidelity Detailed Tile Layers
-        // 1. CartoDB Voyager: Super detailed, crisp typography, clean highway markers & city labels
-        const detailedStreets = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-            subdomains: 'abcd',
-            maxZoom: 20,
-            detectRetina: true,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        // High-Fidelity Detailed Tile Layers (100% Free, No API Key Required)
+        // 1. Detailed Streets: OpenStreetMap — Complete street & highway grid across Maharashtra
+        const detailedStreets = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         });
 
         // 2. Satellite Hybrid: Real high-res satellite imagery + transportation & city name overlays
@@ -95,18 +93,20 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         const satelliteHybrid = L.layerGroup([satelliteImagery, satelliteLabels]);
 
-        // 3. Dark Matter: Matches the dark aesthetic of MahaRoute
-        const darkMatrix = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-            subdomains: 'abcd',
-            maxZoom: 20,
-            detectRetina: true,
-            attribution: '&copy; OpenStreetMap &copy; CARTO'
+        // 3. Dark Matrix: Esri Canvas Dark Gray + crisp night navigation labels (No API Key needed)
+        const darkBase = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 16,
+            attribution: '&copy; Esri, DeLorme, NAVTEQ'
         });
+        const darkLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 16
+        });
+        const darkMatrix = L.layerGroup([darkBase, darkLabels]);
 
-        // 4. Standard OpenStreetMap
-        const standardOsm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        // 4. Topographic Terrain: Detailed elevation relief, rivers, landmarks & roads
+        const topoTerrain = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
             maxZoom: 19,
-            attribution: '&copy; OpenStreetMap contributors'
+            attribution: '&copy; Esri, DeLorme, USGS, TomTom'
         });
 
         const initialZoom = window.innerWidth <= 768 ? 6.5 : 7;
@@ -119,12 +119,12 @@ document.addEventListener('DOMContentLoaded', function() {
             attributionControl: true
         });
 
-        // Layer Switcher Control (Detailed Streets / Satellite Hybrid / Dark Matrix / OpenStreetMap)
+        // Layer Switcher Control (Detailed Streets / Satellite Hybrid / Dark Matrix / Topo Terrain)
         const baseLayers = {
             "🗺️ Detailed Streets": detailedStreets,
             "🛰️ Satellite Hybrid": satelliteHybrid,
             "🌙 Dark Matrix": darkMatrix,
-            "🛣️ OpenStreetMap": standardOsm
+            "🏔️ Topo Terrain": topoTerrain
         };
         L.control.layers(baseLayers, null, { position: 'topright' }).addTo(map);
         L.control.zoom({ position: 'topright' }).addTo(map);
