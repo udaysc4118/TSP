@@ -62,17 +62,9 @@ window.addEventListener('resize', triggerMapResize);
 window.addEventListener('orientationchange', () => setTimeout(triggerMapResize, 250));
 
 document.addEventListener('DOMContentLoaded', function() {
-    // ── Mobile init: show map, hide sidebar ──
-    if (window.innerWidth <= 992) {
-        const sidebar = document.getElementById('sidebarPanel');
-        const mapArea = document.getElementById('mapArea');
-        if (sidebar) sidebar.classList.add('mobile-hidden');
-        if (mapArea) mapArea.classList.remove('mobile-hidden');
-        // Ensure Map tab is active
-        const tabMap = document.getElementById('tabMapBtn');
-        const tabCtrl = document.getElementById('tabControlsBtn');
-        if (tabMap) tabMap.classList.add('active');
-        if (tabCtrl) tabCtrl.classList.remove('active');
+    // ── Mobile init: Open Controls tab by default on mobile so user can select cities immediately! ──
+    if (window.innerWidth <= 820) {
+        switchMobileTab('controls');
     }
 
     try {
@@ -115,6 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
             zoom: initialZoom,
             zoomSnap: 0.5,
             zoomControl: false,
+            scrollWheelZoom: false,
             layers: [detailedStreets],
             attributionControl: true
         });
@@ -186,6 +179,9 @@ function clearMap() {
     // Hide map info badge
     const mapInfoBadge = document.getElementById('mapInfoBadge');
     if (mapInfoBadge) mapInfoBadge.style.display = 'none';
+    // Hide mobile map scroll button
+    const mobileMapScrollBtn = document.getElementById('mobileMapScrollBtn');
+    if (mobileMapScrollBtn) mobileMapScrollBtn.style.display = 'none';
 }
 
 // ── Mobile Tab Switcher ──
@@ -224,6 +220,14 @@ function switchMobileTab(tab) {
             const anchor = document.getElementById('analyticsHUD') || document.getElementById('mobileResultsAnchor');
             if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 100);
+    }
+}
+
+// Smooth scroll to results for mobile
+function scrollToAnalysisSection() {
+    const anchor = document.getElementById('analyticsHUD') || document.getElementById('mobileResultsAnchor') || document.getElementById('analysisSplit');
+    if (anchor) {
+        anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 }
 
@@ -923,15 +927,24 @@ async function run() {
         setTimeout(() => { mapInfoBadge.style.display = 'none'; }, 4000);
     }
 
-    // On desktop: scroll to results smoothly (matrix section first, then route structure below)
-    const isMobile = window.innerWidth <= 992;
+    // Responsive layout handling after calculation
+    const isMobile = window.innerWidth <= 820;
     if (!isMobile) {
         document.getElementById('analyticsHUD')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } else {
-        // On mobile: switch map back into view, then scroll to results section
+        // On mobile: switch to map tab so full route & villages are clearly framed in viewport!
         switchMobileTab('map');
         setTimeout(() => {
-            document.getElementById('analyticsHUD')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 300);
+            triggerMapResize();
+            if (coords && coords.length > 0) {
+                const bounds = L.latLngBounds(coords);
+                map.fitBounds(bounds, { padding: [25, 25], maxZoom: 13 });
+            }
+            // Show floating scroll pill so user can easily scroll down to analytics when ready
+            const mobileMapScrollBtn = document.getElementById('mobileMapScrollBtn');
+            if (mobileMapScrollBtn) {
+                mobileMapScrollBtn.style.display = 'inline-flex';
+            }
+        }, 250);
     }
 }
