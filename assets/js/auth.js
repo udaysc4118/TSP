@@ -12,6 +12,11 @@ const API_URL = (() => {
         return `http://${host}:5000/api`;
     }
 
+    // If served from Vercel or same origin where /api is hosted
+    if (host.includes('vercel.app')) {
+        return `${window.location.origin}/api`;
+    }
+
     return 'https://maharoute-ai-backend.onrender.com/api';
 })();
 
@@ -121,9 +126,15 @@ if (submitSignup) {
             document.getElementById("signupStep2").style.display = "block";
             
             let otpSuccess = document.getElementById("otpSuccess");
-            otpSuccess.textContent = data.message;
+            if (data.otpHint) {
+                const suOtpInput = document.getElementById("su_otp");
+                if (suOtpInput) suOtpInput.value = data.otpHint;
+                otpSuccess.innerHTML = `<i class="ri-checkbox-circle-fill"></i> Code: <b style="font-size:16px; letter-spacing:2px; color:#fff;">${data.otpHint}</b> (Auto-filled on screen + sent to email)`;
+            } else {
+                otpSuccess.textContent = data.message || "A 6-digit confirmation code has been generated!";
+            }
             otpSuccess.style.display = "block";
-            setTimeout(() => { otpSuccess.style.display = "none"; }, 5000);
+            setTimeout(() => { otpSuccess.style.display = "none"; }, 8000);
 
             submitSignup.disabled = false;
             submitSignup.innerHTML = "Create Account <i class='ri-arrow-right-line'></i>";
@@ -173,11 +184,17 @@ if (resendOtpBtn) {
                 return;
             }
 
-            success.textContent = "Code resent securely!";
+            if (data.otpHint) {
+                const suOtpInput = document.getElementById("su_otp");
+                if (suOtpInput) suOtpInput.value = data.otpHint;
+                success.innerHTML = `<i class="ri-refresh-line"></i> New Code: <b style="font-size:16px; letter-spacing:2px; color:#fff;">${data.otpHint}</b> (Auto-filled)`;
+            } else {
+                success.textContent = "New confirmation code generated!";
+            }
             success.style.display = "block";
             resendOtpBtn.disabled = false;
             resendOtpBtn.textContent = "Resend Code";
-            setTimeout(() => { success.style.display = "none"; }, 4000);
+            setTimeout(() => { success.style.display = "none"; }, 6000);
         } catch(e) {
             err.textContent="Server connection error";
             err.style.display="block";
@@ -376,9 +393,15 @@ if (submitForgotPass) {
             document.getElementById("rp_confirmpass").value = "";
 
             let resetSuccess = document.getElementById("resetSuccess");
-            resetSuccess.textContent = data.message;
+            if (data.otpHint) {
+                const rpOtpInput = document.getElementById("rp_otp");
+                if (rpOtpInput) rpOtpInput.value = data.otpHint;
+                resetSuccess.innerHTML = `<i class="ri-key-2-line"></i> Reset Code: <b style="font-size:16px; letter-spacing:2px; color:#fff;">${data.otpHint}</b> (Auto-filled)`;
+            } else {
+                resetSuccess.textContent = data.message;
+            }
             resetSuccess.style.display = "block";
-            setTimeout(() => { resetSuccess.style.display = "none"; }, 6000);
+            setTimeout(() => { resetSuccess.style.display = "none"; }, 8000);
 
             switchPanel(resetPanel);
 
@@ -476,9 +499,15 @@ if (resendResetOtp) {
                 err.textContent = data.error || "Failed to resend";
                 err.style.display = "block";
             } else {
-                success.textContent = "New reset code sent to your email!";
+                if (data.otpHint) {
+                    const rpOtpInput = document.getElementById("rp_otp");
+                    if (rpOtpInput) rpOtpInput.value = data.otpHint;
+                    success.innerHTML = `<i class="ri-refresh-line"></i> New Code: <b style="font-size:16px; letter-spacing:2px; color:#fff;">${data.otpHint}</b> (Auto-filled)`;
+                } else {
+                    success.textContent = "New reset code sent!";
+                }
                 success.style.display = "block";
-                setTimeout(() => { success.style.display = "none"; }, 4000);
+                setTimeout(() => { success.style.display = "none"; }, 6000);
             }
 
             resendResetOtp.disabled = false;
