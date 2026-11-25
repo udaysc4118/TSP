@@ -3,8 +3,12 @@
         if (window.location.protocol === 'file:') return 'http://localhost:5000/api';
         const host = window.location.hostname;
         const port = window.location.port;
-        if ((host === 'localhost' || host === '127.0.0.1') && port && port !== '5000') {
+        if (host === 'localhost' || host === '127.0.0.1') {
+            if (port === '5000' || !port) return `${window.location.protocol}//${host}:5000/api`;
             return `http://${host}:5000/api`;
+        }
+        if (host.includes('vercel.app')) {
+            return `${window.location.origin}/api`;
         }
         return 'https://maharoute-ai-backend.onrender.com/api';
     })();

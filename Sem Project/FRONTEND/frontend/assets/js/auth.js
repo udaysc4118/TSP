@@ -69,6 +69,9 @@ async function apiFetch(endpoint, options = {}) {
     throw lastError || new Error('Server connection error. Please try again.');
 }
 
+// Warm up backend silently on login page load to reduce cloud cold-start delays
+fetch(`${API_URL}/health`, { method: 'GET' }).catch(() => {});
+
 // Clear any stale credentials when arriving at login page
 sessionStorage.removeItem("mfp_token");
 sessionStorage.removeItem("mfp_user");
@@ -211,6 +214,13 @@ if (resendOtpBtn) {
         let success = document.getElementById("otpSuccess");
         err.style.display = "none";
         success.style.display = "none";
+
+        const targetEmail = (pendingSignup.email || document.getElementById("su_email")?.value || '').trim().toLowerCase();
+        if (!targetEmail) {
+            err.textContent = "Email missing. Please go back and enter your email.";
+            err.style.display = "block";
+            return;
+        }
         
         resendOtpBtn.disabled = true;
         resendOtpBtn.textContent = "Sending...";
@@ -219,7 +229,7 @@ if (resendOtpBtn) {
             let res = await apiFetch(`/auth/resend-otp`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: pendingSignup.email })
+                body: JSON.stringify({ email: targetEmail })
             });
             let data = await parseResponse(res);
             
@@ -251,11 +261,18 @@ if (resendOtpBtn) {
 const verifyOtpBtn = document.getElementById("verifyOtpBtn");
 if (verifyOtpBtn) {
     verifyOtpBtn.onclick = async () => {
-        let otp = document.getElementById("su_otp").value.trim();
+        let otp = document.getElementById("su_otp").value.replace(/\s+/g, '').trim();
         let err = document.getElementById("otpErr");
 
         err.style.display="none";
         if(!otp) { err.textContent="Enter your 6-digit code"; err.style.display="block"; return; }
+
+        const signupPayload = {
+            name: (pendingSignup.name || document.getElementById("su_name")?.value || '').trim(),
+            email: (pendingSignup.email || document.getElementById("su_email")?.value || '').trim().toLowerCase(),
+            password: pendingSignup.password || document.getElementById("su_pass")?.value || '',
+            otp
+        };
 
         verifyOtpBtn.disabled = true;
         verifyOtpBtn.innerHTML = "Verifying... <i class='ri-loader-4-line ri-spin'></i>";
@@ -264,7 +281,7 @@ if (verifyOtpBtn) {
             let res = await apiFetch(`/auth/signup-verify`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...pendingSignup, otp })
+                body: JSON.stringify(signupPayload)
             });
             let data = await parseResponse(res);
             
@@ -462,7 +479,7 @@ if (submitForgotPass) {
 const submitResetPass = document.getElementById("submitResetPass");
 if (submitResetPass) {
     submitResetPass.onclick = async () => {
-        let otp = document.getElementById("rp_otp").value.trim();
+        let otp = document.getElementById("rp_otp").value.replace(/\s+/g, '').trim();
         let newPassword = document.getElementById("rp_newpass").value;
         let confirmPass = document.getElementById("rp_confirmpass").value;
         let err = document.getElementById("resetErr");

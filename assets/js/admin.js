@@ -1,24 +1,37 @@
 // frontend/assets/js/admin.js
 
+const CLOUD_API_URL = 'https://maharoute-ai-backend.onrender.com/api';
+
 const API_URL = (() => {
     if (window.location.protocol === 'file:') return 'http://localhost:5000/api';
     const host = window.location.hostname;
     const port = window.location.port;
-    if ((host === 'localhost' || host === '127.0.0.1') && port && port !== '5000') {
+    if (host === 'localhost' || host === '127.0.0.1') {
+        if (port === '5000' || !port) return `${window.location.protocol}//${host}:5000/api`;
         return `http://${host}:5000/api`;
     }
-    return 'https://maharoute-ai-backend.onrender.com/api';
+    if (host.includes('vercel.app')) {
+        return `${window.location.origin}/api`;
+    }
+    return CLOUD_API_URL;
 })();
 
 const token = sessionStorage.getItem("mfp_token") || localStorage.getItem("mfp_token");
 const userStr = sessionStorage.getItem("mfp_user") || localStorage.getItem("mfp_user");
 
+function decodeJwtPayload(tokenStr) {
+    const parts = tokenStr.split('.');
+    if (parts.length !== 3) return null;
+    let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    return JSON.parse(atob(b64));
+}
+
 function isTokenValid(tokenStr) {
     if (!tokenStr) return false;
     try {
-        const parts = tokenStr.split('.');
-        if (parts.length !== 3) return false;
-        const payload = JSON.parse(atob(parts[1]));
+        const payload = decodeJwtPayload(tokenStr);
+        if (!payload) return false;
         if (payload.exp && Date.now() >= payload.exp * 1000) return false;
         return true;
     } catch(e) {
@@ -39,8 +52,8 @@ if (!token || !userStr || !isTokenValid(token)) {
     clearAdminAuthAndRedirect();
 } else {
     try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        if (payload.role !== 'admin') {
+        const payload = decodeJwtPayload(token);
+        if (!payload || payload.role !== 'admin') {
             alert("SECURITY: Authorized Personnel Only.\n\nYour standard token has been wiped. Please authenticate via the Admin Gateway.");
             clearAdminAuthAndRedirect();
         } else {

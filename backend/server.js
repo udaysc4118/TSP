@@ -50,6 +50,9 @@ app.use((req, res, next) => {
 let initPromise = null;
 let backendMode = 'initializing';
 
+// Ensure database backend is initialized BEFORE any /api route executes (critical for Vercel serverless)
+app.use('/api', ensureBackendReady);
+
 // Health check (no auth) to verify backend is up
 app.get('/api/health', (req, res) => {
     res.json({
@@ -70,14 +73,14 @@ const candidateFrontendDirs = [
 ];
 const frontendDir = candidateFrontendDirs.find(d => fs.existsSync(path.join(d, 'login.html'))) || __dirname;
 
-// Serve frontend static assets
-app.use(express.static(frontendDir));
-
-// Serve primary pages explicitly
+// Serve primary pages explicitly before static middleware so '/' serves login.html cleanly
 app.get('/', (req, res) => res.sendFile(path.join(frontendDir, 'login.html')));
 app.get('/login.html', (req, res) => res.sendFile(path.join(frontendDir, 'login.html')));
 app.get('/index.html', (req, res) => res.sendFile(path.join(frontendDir, 'index.html')));
 app.get('/admin.html', (req, res) => res.sendFile(path.join(frontendDir, 'admin.html')));
+
+// Serve frontend static assets
+app.use(express.static(frontendDir, { index: false }));
 
 
 const supabaseUrl = process.env.SUPABASE_URL || 'https://qcrvyeemxuzvmwwaiwgj.supabase.co';
@@ -127,7 +130,11 @@ function readLocalDb() {
             path.join(__dirname, 'local_db.json'),
             JSON.stringify(defaultDb, null, 2)
         );
-        return defaultDb;
+        try {
+            return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+        } catch (e) {
+            return defaultDb;
+        }
     }
     try {
         return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
@@ -137,7 +144,18 @@ function readLocalDb() {
 }
 
 function writeLocalDb(db) {
+    ensureRuntimeDataDir();
     fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8');
+}
+
+function matchFilter(item, filter) {
+    if (filter.isOr) {
+        return filter.clauses.some(clause => matchFilter(item, clause));
+    }
+    if (filter.isIlike) {
+        return String(item[filter.col] || '').toLowerCase() === String(filter.val || '').toLowerCase();
+    }
+    return String(item[filter.col]) === String(filter.val);
 }
 
 function createLocalSupabaseMock() {
@@ -151,6 +169,7 @@ function createLocalSupabaseMock() {
                 _order: null,
                 _limit: null,
                 _single: false,
+                _maybeSingle: false,
                 _op: 'select',
                 _insertData: null,
                 _updateData: null,
@@ -165,6 +184,26 @@ function createLocalSupabaseMock() {
                 },
                 ilike: function(col, val) {
                     this._eq.push({ col, val, isIlike: true });
+                    return this;
+                },
+                or: function(expr) {
+                    const clauses = String(expr || '')
+                        .split(',')
+                        .map(part => part.trim())
+                        .filter(Boolean)
+                        .map(part => {
+                            const dotIdx = part.indexOf('.');
+                            const col = dotIdx > 0 ? part.slice(0, dotIdx) : '';
+                            const rest = dotIdx > 0 ? part.slice(dotIdx + 1) : '';
+                            const dot2 = rest.indexOf('.');
+                            const op = dot2 > 0 ? rest.slice(0, dot2) : 'eq';
+                            const val = dot2 > 0 ? rest.slice(dot2 + 1) : rest;
+                            return { col, val, isIlike: op === 'ilike' };
+                        })
+                        .filter(c => c.col);
+                    if (clauses.length > 0) {
+                        this._eq.push({ isOr: true, clauses });
+                    }
                     return this;
                 },
                 gte: function(col, val) {
@@ -210,11 +249,7 @@ function createLocalSupabaseMock() {
                     if (this._op === 'select') {
                         let result = [...data];
                         this._eq.forEach(filter => {
-                            if (filter.isIlike) {
-                                result = result.filter(item => String(item[filter.col] || '').toLowerCase() === String(filter.val || '').toLowerCase());
-                            } else {
-                                result = result.filter(item => String(item[filter.col]) === String(filter.val));
-                            }
+                            result = result.filter(item => matchFilter(item, filter));
                         });
                         this._gte.forEach(filter => {
                             result = result.filter(item => new Date(item[filter.col]) >= new Date(filter.val));
@@ -240,7 +275,7 @@ function createLocalSupabaseMock() {
 
                         let finalData = this._single ? (result[0] || null) : result;
                         let error = null;
-                        if (this._single && !result[0]) {
+                        if (this._single && !this._maybeSingle && !result[0]) {
                             error = { message: 'Row not found', code: 'PGRST116' };
                         }
                         resolve({ data: finalData, error });
@@ -269,7 +304,7 @@ function createLocalSupabaseMock() {
                     } else if (this._op === 'update') {
                         let updatedItems = [];
                         db[this.table] = db[this.table].map(item => {
-                            const matchesEq = this._eq.every(filter => String(item[filter.col]) === String(filter.val));
+                            const matchesEq = this._eq.every(filter => matchFilter(item, filter));
                             if (matchesEq) {
                                 const updated = { ...item, ...this._updateData };
                                 updatedItems.push(updated);
@@ -283,7 +318,7 @@ function createLocalSupabaseMock() {
 
                     } else if (this._op === 'delete') {
                         db[this.table] = db[this.table].filter(item => {
-                            const matchesEq = this._eq.every(filter => String(item[filter.col]) === String(filter.val));
+                            const matchesEq = this._eq.every(filter => matchFilter(item, filter));
                             return !matchesEq;
                         });
                         writeLocalDb(db);
@@ -359,68 +394,135 @@ function verifyAdminToken(req, res, next) {
     });
 }
 
-// ── Bulletproof SMTP Transporter with Direct Verified Fallback ──
+// ── Multi-Channel Email Delivery (HTTPS APIs first, then SMTP 465 -> 587) ──
 const SMTP_USER = process.env.SMTP_USER || 'omparil1212@gmail.com';
 const SMTP_PASS = process.env.SMTP_PASS || 'tdtromnxapmvevez';
+const EMAIL_FROM = process.env.EMAIL_FROM || SMTP_USER;
+
+function buildOtpEmailHtml(otp) {
+    return `
+        <div style="font-family: Arial, sans-serif; background: #0a0c12; padding: 40px; color: #ffffff; border-radius: 10px; max-width: 600px; margin: 0 auto; text-align: center;">
+            <h1 style="color: #fb923c;">MahaRoute AI</h1>
+            <p style="font-size: 16px; color: #a0a0a0;">Here is your secure One-Time Password:</p>
+            <div style="font-size: 36px; font-weight: bold; letter-spacing: 5px; color: #ffffff; background: #1a1e2a; border: 2px dashed #fb923c; padding: 20px; border-radius: 15px; margin: 30px 0;">
+                ${otp}
+            </div>
+            <p style="font-size: 14px; color: #a0a0a0;">This code is valid for exactly 10 minutes. Please do not share it with anyone.</p>
+            <div style="margin-top: 40px; text-align: left; padding-top: 25px; border-top: 1px solid rgba(251, 146, 60, 0.3);">
+                <p style="font-size: 15px; color: #e2e8f0; line-height: 1.7;">
+                    Thank you for using MahaRoute AI. If you did not request this verification code, please ignore this email.
+                </p>
+                <p style="font-size: 15px; color: #fb923c; font-weight: bold; margin-top: 20px;">
+                    Warm Regards,<br>
+                    The MahaRoute AI Security Team
+                </p>
+            </div>
+        </div>
+    `;
+}
+
+async function sendViaHttpsProviders(email, subject, html, otp, subjectPrefix) {
+    // 1. Optional Resend HTTP API (Port 443 - never blocked on Render/Vercel)
+    if (process.env.RESEND_API_KEY) {
+        const resp = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                from: process.env.RESEND_FROM || 'MahaRoute Security <onboarding@resend.dev>',
+                to: [email],
+                subject,
+                html
+            })
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (resp.ok) {
+            console.log(`[RESEND SUCCESS] Email delivered to ${email}, id: ${data.id}`);
+            return data;
+        }
+        console.warn(`[RESEND FAILED] (${resp.status}):`, data.message || data.error || 'Unknown error');
+    }
+
+    // 2. Optional Brevo HTTP API (Port 443)
+    if (process.env.BREVO_API_KEY) {
+        const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: {
+                'api-key': process.env.BREVO_API_KEY,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                sender: { name: 'MahaRoute Security', email: EMAIL_FROM },
+                to: [{ email }],
+                subject,
+                htmlContent: html
+            })
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (resp.ok) {
+            console.log(`[BREVO SUCCESS] Email delivered to ${email}, id: ${data.messageId}`);
+            return data;
+        }
+        console.warn(`[BREVO FAILED] (${resp.status}):`, data.message || 'Unknown error');
+    }
+
+    // 3. Optional Mail Webhook (e.g. Google Apps Script Web App over Port 443)
+    const webhookUrl = process.env.MAIL_WEBHOOK_URL || process.env.OTP_WEBHOOK_URL;
+    if (webhookUrl) {
+        const resp = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: email, subject, html, otp, subjectPrefix })
+        });
+        if (resp.ok) {
+            console.log(`[MAIL-WEBHOOK SUCCESS] Email delivered to ${email}`);
+            return { ok: true };
+        }
+        console.warn(`[MAIL-WEBHOOK FAILED] (${resp.status})`);
+    }
+
+    return null;
+}
 
 async function sendOtpEmail(email, otp, subjectPrefix = 'Verification Code') {
+    const subject = `Your MahaRoute ${subjectPrefix}: ${otp}`;
+    const html = buildOtpEmailHtml(otp);
+
+    const httpsResult = await sendViaHttpsProviders(email, subject, html, otp, subjectPrefix);
+    if (httpsResult) return httpsResult;
+
     const mailOptions = {
         from: `"MahaRoute Security" <${SMTP_USER}>`,
         to: email,
-        subject: `Your MahaRoute ${subjectPrefix}: ${otp}`,
-        html: `
-            <div style="font-family: Arial, sans-serif; background: #0a0c12; padding: 40px; color: #ffffff; border-radius: 10px; max-width: 600px; margin: 0 auto; text-align: center;">
-                <h1 style="color: #fb923c;">MahaRoute AI</h1>
-                <p style="font-size: 16px; color: #a0a0a0;">Here is your secure One-Time Password:</p>
-                <div style="font-size: 36px; font-weight: bold; letter-spacing: 5px; color: #ffffff; background: #1a1e2a; border: 2px dashed #fb923c; padding: 20px; border-radius: 15px; margin: 30px 0;">
-                    ${otp}
-                </div>
-                <p style="font-size: 14px; color: #a0a0a0;">This code is valid for exactly 10 minutes. Please do not share it with anyone.</p>
-                <div style="margin-top: 40px; text-align: left; padding-top: 25px; border-top: 1px solid rgba(251, 146, 60, 0.3);">
-                    <p style="font-size: 15px; color: #e2e8f0; line-height: 1.7;">
-                        Thank you for using MahaRoute AI. If you did not request this verification code, please ignore this email.
-                    </p>
-                    <p style="font-size: 15px; color: #fb923c; font-weight: bold; margin-top: 20px;">
-                        Warm Regards,<br>
-                        The MahaRoute AI Security Team
-                    </p>
-                </div>
-            </div>
-        `
+        subject,
+        html
     };
 
-    // Tier 1: Service Gmail (Highest compatibility on all cloud platforms including Render & Vercel)
+    // Resolve IPv4 explicitly so cloud containers without IPv6 never hit ENETUNREACH (:::0)
+    let smtpHost = 'smtp.gmail.com';
     try {
-        const serviceMailer = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                user: SMTP_USER,
-                pass: SMTP_PASS
-            },
-            connectionTimeout: 4000,
-            greetingTimeout: 3000,
-            socketTimeout: 6000
-        });
-        const info = await serviceMailer.sendMail(mailOptions);
-        console.log(`[SMTP-GMAIL SUCCESS] Email delivered to ${email}, id: ${info.messageId}`);
-        return info;
-    } catch (errService) {
-        console.warn(`[SMTP-GMAIL FAILED] (${errService.message}). Trying direct port 465...`);
+        const resolved = await dns.promises.lookup('smtp.gmail.com', { family: 4 });
+        if (resolved && resolved.address) {
+            smtpHost = resolved.address;
+        }
+    } catch (dnsErr) {
+        console.warn('[DNS IPv4 LOOKUP FALLBACK]', dnsErr.message);
     }
 
-    // Tier 2: Port 465 (Direct SSL)
+    // Tier 1: Port 465 (Direct SSL over IPv4 - fits well within serverless 10s execution budget)
     try {
         const mailer465 = nodemailer.createTransport({
-            host: 'smtp.gmail.com',
+            host: smtpHost,
             port: 465,
             secure: true,
-            auth: {
-                user: SMTP_USER,
-                pass: SMTP_PASS
-            },
-            connectionTimeout: 4000,
-            greetingTimeout: 3000,
-            socketTimeout: 6000
+            family: 4,
+            tls: { servername: 'smtp.gmail.com' },
+            auth: { user: SMTP_USER, pass: SMTP_PASS },
+            connectionTimeout: 4500,
+            greetingTimeout: 3500,
+            socketTimeout: 5500
         });
         const info = await mailer465.sendMail(mailOptions);
         console.log(`[SMTP-465 SUCCESS] Email delivered to ${email}, id: ${info.messageId}`);
@@ -429,23 +531,110 @@ async function sendOtpEmail(email, otp, subjectPrefix = 'Verification Code') {
         console.warn(`[SMTP-465 FAILED] (${err465.message}). Trying fallback port 587...`);
     }
 
-    // Tier 3: Port 587 (STARTTLS)
-    const mailer587 = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 587,
-        secure: false,
-        requireTLS: true,
-        auth: {
-            user: SMTP_USER,
-            pass: SMTP_PASS
-        },
-        connectionTimeout: 4000,
-        greetingTimeout: 3000,
-        socketTimeout: 6000
-    });
-    const info = await mailer587.sendMail(mailOptions);
-    console.log(`[SMTP-587 SUCCESS] Email delivered to ${email}, id: ${info.messageId}`);
-    return info;
+    // Tier 2: Port 587 (STARTTLS over IPv4)
+    try {
+        const mailer587 = nodemailer.createTransport({
+            host: smtpHost,
+            port: 587,
+            secure: false,
+            requireTLS: true,
+            family: 4,
+            tls: { servername: 'smtp.gmail.com' },
+            auth: { user: SMTP_USER, pass: SMTP_PASS },
+            connectionTimeout: 4000,
+            greetingTimeout: 3000,
+            socketTimeout: 5000
+        });
+        const info = await mailer587.sendMail(mailOptions);
+        console.log(`[SMTP-587 SUCCESS] Email delivered to ${email}, id: ${info.messageId}`);
+        return info;
+    } catch (err587) {
+        const msg = String(err587.message || 'SMTP delivery failed');
+        if (msg.toLowerCase().includes('timeout') || msg.toLowerCase().includes('enetunreach')) {
+            throw new Error('SMTP connection blocked/timed out on this host (Render free tier blocks ports 465/587). Configure RESEND_API_KEY, BREVO_API_KEY, or MAIL_WEBHOOK_URL on Render, or run via Vercel/localhost.');
+        }
+        throw err587;
+    }
+}
+
+// ========================
+// AUTH HELPERS
+// ========================
+
+function normalizeEmail(email) {
+    return String(email || '').trim().toLowerCase();
+}
+
+function normalizeOtp(otp) {
+    return String(otp || '').replace(/\s+/g, '').trim();
+}
+
+async function findUserByEmail(normalizedEmail, fields = '*') {
+    const { data, error } = await supabase
+        .from('users')
+        .select(fields)
+        .ilike('email', normalizedEmail)
+        .limit(1);
+    if (error) return { user: null, error };
+    const user = Array.isArray(data) ? (data[0] || null) : data;
+    return { user, error: null };
+}
+
+async function findAdminByIdentifier(identifier) {
+    const normalized = normalizeEmail(identifier);
+    if (!normalized) return { admin: null, error: null };
+
+    const candidates = [normalized];
+    if (!normalized.includes('@')) {
+        candidates.push(`${normalized}@maharoute.ai`);
+    } else {
+        const localPart = normalized.split('@')[0];
+        if (localPart) candidates.push(localPart);
+    }
+
+    for (const candidate of candidates) {
+        const { data, error } = await supabase
+            .from('admins')
+            .select('*')
+            .ilike('admin_id', candidate)
+            .limit(1);
+        if (error) return { admin: null, error };
+        const found = Array.isArray(data) ? data[0] : data;
+        if (found) return { admin: found, error: null };
+    }
+    return { admin: null, error: null };
+}
+
+async function verifyAdminPassword(adminUser, password) {
+    const adminStoredPrimary = typeof adminUser.password_hash === 'string' ? adminUser.password_hash : null;
+    const adminStoredLegacy = typeof adminUser.password === 'string' ? adminUser.password : null;
+
+    if (adminStoredPrimary) {
+        if (isBcryptHash(adminStoredPrimary)) {
+            return await bcrypt.compare(password, adminStoredPrimary)
+                || (password.trim() !== password && await bcrypt.compare(password.trim(), adminStoredPrimary));
+        }
+        const { data: pgcryptRes } = await supabase.rpc('check_admin_pass', { a_id: adminUser.admin_id, a_pass: password });
+        return Boolean(pgcryptRes);
+    }
+    if (adminStoredLegacy) {
+        return await comparePasswordCompat(password, adminStoredLegacy)
+            || await comparePasswordCompat(password.trim(), adminStoredLegacy);
+    }
+    return null;
+}
+
+async function findLatestOtpRecord(normalizedEmail, normalizedOtp) {
+    const { data, error } = await supabase
+        .from('otps')
+        .select('*')
+        .ilike('email', normalizedEmail)
+        .eq('otp', normalizedOtp)
+        .order('created_at', { ascending: false })
+        .limit(1);
+    if (error) return { record: null, error };
+    const record = Array.isArray(data) ? (data[0] || null) : data;
+    return { record, error: null };
 }
 
 // ========================
@@ -455,22 +644,20 @@ async function sendOtpEmail(email, otp, subjectPrefix = 'Verification Code') {
 // Sign Up Request (Generates Custom OTP using Nodemailer + Otps table)
 app.post('/api/auth/signup-request', async (req, res) => {
     try {
-        const { name, email, password } = req.body;
-        if (!name || !email || !password) return res.status(400).json({ error: 'All fields are required' });
-        const normalizedEmail = String(email).trim().toLowerCase();
+        const name = String(req.body?.name || '').trim();
+        const normalizedEmail = normalizeEmail(req.body?.email);
+        const password = req.body?.password;
+        if (!name || !normalizedEmail || !password) return res.status(400).json({ error: 'All fields are required' });
+        if (String(password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
 
         // Block if email exists in public.users
-        const { data: existingUser } = await supabase
-            .from('users')
-            .select('id')
-            .ilike('email', normalizedEmail)
-            .maybeSingle();
+        const { user: existingUser, error: lookupError } = await findUserByEmail(normalizedEmail, 'id');
+        if (lookupError) throw lookupError;
 
         if (existingUser) return res.status(400).json({ error: 'Email already registered' });
 
         // Generate customized secure 6-digit OTP
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        // Expires in 10 minutes
         const expiresAt = new Date(Date.now() + 10 * 60000).toISOString();
 
         // Expire/cleanup previous OTPs for this email
@@ -487,12 +674,12 @@ app.post('/api/auth/signup-request', async (req, res) => {
         } catch (mailErr) {
             console.error('[EMAIL ERROR] Failed to send OTP email to', normalizedEmail, mailErr.message);
             await supabase.from('otps').delete().ilike('email', normalizedEmail);
-            return res.status(500).json({ 
-                error: 'Could not send verification email: ' + (mailErr.message || 'SMTP delivery failed') 
+            return res.status(500).json({
+                error: 'Could not send verification email: ' + (mailErr.message || 'SMTP delivery failed')
             });
         }
 
-        res.json({ 
+        res.json({
             message: 'A 6-digit OTP code has been sent directly to your email inbox! Please check your email (and spam/junk folder).',
             email: normalizedEmail
         });
@@ -505,11 +692,9 @@ app.post('/api/auth/signup-request', async (req, res) => {
 // Resend OTP
 app.post('/api/auth/resend-otp', async (req, res) => {
     try {
-        const { email } = req.body;
-        if (!email) return res.status(400).json({ error: 'Email required' });
-        const normalizedEmail = String(email).trim().toLowerCase();
-        
-        // Generate customized secure 6-digit OTP
+        const normalizedEmail = normalizeEmail(req.body?.email);
+        if (!normalizedEmail) return res.status(400).json({ error: 'Email required' });
+
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
         const expiresAt = new Date(Date.now() + 10 * 60000).toISOString();
 
@@ -526,7 +711,7 @@ app.post('/api/auth/resend-otp', async (req, res) => {
             return res.status(500).json({ error: 'Failed to resend code: ' + (mailErr.message || 'SMTP error') });
         }
 
-        res.json({ 
+        res.json({
             message: 'A fresh 6-digit OTP code has been sent directly to your email inbox! Please check your email.',
             email: normalizedEmail
         });
@@ -538,31 +723,29 @@ app.post('/api/auth/resend-otp', async (req, res) => {
 // Sign Up Verify
 app.post('/api/auth/signup-verify', async (req, res) => {
     try {
-        const { name, email, password, otp } = req.body;
-        if (!email || !otp) return res.status(400).json({ error: 'Email and OTP required' });
-        const normalizedEmail = String(email).trim().toLowerCase();
+        const name = String(req.body?.name || '').trim();
+        const normalizedEmail = normalizeEmail(req.body?.email);
+        const password = req.body?.password;
+        const normalizedOtp = normalizeOtp(req.body?.otp);
+        if (!normalizedEmail || !normalizedOtp) return res.status(400).json({ error: 'Email and OTP required' });
+        if (!name || !password) return res.status(400).json({ error: 'Name and password are required. Please restart signup.' });
+        if (String(password).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
 
         // Verify Custom OTP
-        const { data: record, error: fetchError } = await supabase
-            .from('otps')
-            .select('*')
-            .ilike('email', normalizedEmail)
-            .eq('otp', String(otp).trim())
-            .maybeSingle();
+        const { record, error: fetchError } = await findLatestOtpRecord(normalizedEmail, normalizedOtp);
 
         if (fetchError || !record) return res.status(400).json({ error: 'Invalid or expired OTP code' });
-        
+
         // Check Expiration
         if (new Date(record.expires_at) < new Date()) {
             await supabase.from('otps').delete().eq('id', record.id);
             return res.status(400).json({ error: 'This OTP has expired' });
         }
 
-        // OTP Validated! 
         // Hash password for public.users
         const password_hash = await bcrypt.hash(password, 10);
 
-        // Insert into public.users beautifully completely independent of Supabase Auth limits
+        // Insert into public.users completely independent of Supabase Auth limits
         let { data: newUser, error: insertError } = await supabase
             .from('users')
             .insert([{ name, email: normalizedEmail, password_hash }])
@@ -581,8 +764,8 @@ app.post('/api/auth/signup-verify', async (req, res) => {
         }
 
         if (insertError) {
-             if (insertError.code === '23505') return res.status(400).json({ error: 'User already exists!' });
-             throw insertError;
+            if (insertError.code === '23505') return res.status(400).json({ error: 'User already exists!' });
+            throw insertError;
         }
 
         // Clean up OTP to prevent replay attacks
@@ -590,7 +773,7 @@ app.post('/api/auth/signup-verify', async (req, res) => {
 
         // Issue token
         const appToken = jwt.sign({ id: newUser.id, role: 'user' }, JWT_SECRET, { expiresIn: '24h' });
-        res.json({ message: 'User created securely', token: appToken, user: { name: newUser.name, email: newUser.email } });
+        res.json({ message: 'User created securely', token: appToken, user: { name: newUser.name, email: newUser.email, role: 'user' } });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Server error during OTP verification' });
@@ -600,17 +783,13 @@ app.post('/api/auth/signup-verify', async (req, res) => {
 // Login
 app.post('/api/auth/login', async (req, res) => {
     try {
-        const { email, password } = req.body;
-        if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
-        const normalizedEmail = String(email).trim().toLowerCase();
+        const normalizedEmail = normalizeEmail(req.body?.email);
+        const password = req.body?.password;
+        if (!normalizedEmail || !password) return res.status(400).json({ error: 'Email and password required' });
 
         console.log(`\n[LOGIN ATTEMPT] Email: ${normalizedEmail}`);
 
-        const { data: user, error } = await supabase
-            .from('users')
-            .select('*')
-            .ilike('email', normalizedEmail)
-            .maybeSingle();
+        const { user, error } = await findUserByEmail(normalizedEmail, '*');
 
         if (error) {
             console.error(`[LOGIN ERROR] Supabase fetch error:`, error);
@@ -619,28 +798,10 @@ app.post('/api/auth/login', async (req, res) => {
 
         if (!user) {
             // Seamless check: Check if this is an admin logging in via the main portal
-            const { data: adminMatches } = await supabase
-                .from('admins')
-                .select('*')
-                .or(`admin_id.eq.${normalizedEmail},admin_id.eq.${normalizedEmail.split('@')[0]}`);
-            const adminUser = Array.isArray(adminMatches) && adminMatches.length > 0 ? adminMatches[0] : null;
+            const { admin: adminUser } = await findAdminByIdentifier(normalizedEmail);
 
             if (adminUser) {
-                const adminStoredPrimary = typeof adminUser.password_hash === 'string' ? adminUser.password_hash : null;
-                const adminStoredLegacy = typeof adminUser.password === 'string' ? adminUser.password : null;
-                let adminMatch = false;
-
-                if (adminStoredPrimary) {
-                    if (isBcryptHash(adminStoredPrimary)) {
-                        adminMatch = await bcrypt.compare(password, adminStoredPrimary) || (password.trim() !== password && await bcrypt.compare(password.trim(), adminStoredPrimary));
-                    } else {
-                        const { data: pgcryptRes } = await supabase.rpc('check_admin_pass', { a_id: adminUser.admin_id, a_pass: password });
-                        adminMatch = pgcryptRes;
-                    }
-                } else if (adminStoredLegacy) {
-                    adminMatch = await comparePasswordCompat(password, adminStoredLegacy) || await comparePasswordCompat(password.trim(), adminStoredLegacy);
-                }
-
+                const adminMatch = await verifyAdminPassword(adminUser, password);
                 if (adminMatch) {
                     const token = jwt.sign({ id: adminUser.id, role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
                     console.log(`[LOGIN SUCCESS] Admin logged in via main portal: ${adminUser.admin_id}`);
@@ -688,15 +849,17 @@ app.post('/api/auth/login', async (req, res) => {
             }
         }
 
-        // Update last login telemetry
-        await supabase.from('users').update({ last_login_at: new Date().toISOString() }).eq('id', user.id);
+        // Update last login telemetry (best-effort so missing column/RLS never blocks login)
+        try {
+            await supabase.from('users').update({ last_login_at: new Date().toISOString() }).eq('id', user.id);
+        } catch (e) {
+            // ignore telemetry failure
+        }
 
         console.log(`[LOGIN SUCCESS] User authenticated successfully: ${user.name} (${user.email})`);
 
         const token = jwt.sign({ id: user.id, role: 'user' }, JWT_SECRET, { expiresIn: '24h' });
         res.json({ message: 'Logged in successfully', token, user: { name: user.name, email: user.email, role: 'user' } });
-
-
     } catch (err) {
         console.error('[LOGIN CRASH]', err);
         res.status(500).json({ error: 'Server error during login' });
@@ -710,15 +873,11 @@ app.post('/api/auth/login', async (req, res) => {
 // Step 1: Request password reset OTP
 app.post('/api/auth/forgot-password', async (req, res) => {
     try {
-        const { email } = req.body;
-        if (!email) return res.status(400).json({ error: 'Email is required' });
+        const normalizedEmail = normalizeEmail(req.body?.email);
+        if (!normalizedEmail) return res.status(400).json({ error: 'Email is required' });
 
         // Check if user exists
-        const { data: user, error } = await supabase
-            .from('users')
-            .select('id, name, email')
-            .eq('email', email.toLowerCase())
-            .single();
+        const { user, error } = await findUserByEmail(normalizedEmail, 'id, name, email');
 
         if (error || !user) return res.status(400).json({ error: 'No account found with this email address' });
 
@@ -727,25 +886,25 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         const expiresAt = new Date(Date.now() + 10 * 60000).toISOString();
 
         // Cleanup old OTPs for this email
-        await supabase.from('otps').delete().eq('email', email.toLowerCase());
+        await supabase.from('otps').delete().ilike('email', normalizedEmail);
 
         // Save new OTP
-        const { error: insertError } = await supabase.from('otps').insert([{ email: email.toLowerCase(), otp, expires_at: expiresAt }]);
+        const { error: insertError } = await supabase.from('otps').insert([{ email: normalizedEmail, otp, expires_at: expiresAt }]);
         if (insertError) throw insertError;
 
         // Send OTP via real email
         try {
-            await sendOtpEmail(email.toLowerCase(), otp, 'Password Reset Code');
-            console.log(`\n[EMAIL DELIVERED] Password Reset OTP Email sent to ${email}!!\n`);
+            await sendOtpEmail(normalizedEmail, otp, 'Password Reset Code');
+            console.log(`\n[EMAIL DELIVERED] Password Reset OTP Email sent to ${normalizedEmail}!!\n`);
         } catch (mailErr) {
             console.error('[EMAIL ERROR] Password reset mail issue:', mailErr.message);
-            await supabase.from('otps').delete().eq('email', email.toLowerCase());
-            return res.status(500).json({ error: 'Could not send reset code to your email. Please try again.' });
+            await supabase.from('otps').delete().ilike('email', normalizedEmail);
+            return res.status(500).json({ error: 'Could not send reset code: ' + (mailErr.message || 'SMTP delivery failed') });
         }
 
-        res.json({ 
+        res.json({
             message: 'A 6-digit password reset code has been sent directly to your email inbox! Please check your email.',
-            email: email.toLowerCase()
+            email: normalizedEmail
         });
     } catch (err) {
         console.error(err);
@@ -756,17 +915,14 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 // Step 2: Verify OTP and set new password
 app.post('/api/auth/reset-password', async (req, res) => {
     try {
-        const { email, otp, newPassword } = req.body;
-        if (!email || !otp || !newPassword) return res.status(400).json({ error: 'All fields are required' });
-        if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+        const normalizedEmail = normalizeEmail(req.body?.email);
+        const normalizedOtp = normalizeOtp(req.body?.otp);
+        const newPassword = req.body?.newPassword;
+        if (!normalizedEmail || !normalizedOtp || !newPassword) return res.status(400).json({ error: 'All fields are required' });
+        if (String(newPassword).length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
 
         // Verify OTP
-        const { data: record, error: fetchError } = await supabase
-            .from('otps')
-            .select('*')
-            .eq('email', email.toLowerCase())
-            .eq('otp', otp)
-            .single();
+        const { record, error: fetchError } = await findLatestOtpRecord(normalizedEmail, normalizedOtp);
 
         if (fetchError || !record) return res.status(400).json({ error: 'Invalid or expired reset code' });
 
@@ -783,20 +939,20 @@ app.post('/api/auth/reset-password', async (req, res) => {
         let { error: updateError } = await supabase
             .from('users')
             .update({ password_hash })
-            .eq('email', email.toLowerCase());
+            .ilike('email', normalizedEmail);
 
         if (updateError && String(updateError.message || '').toLowerCase().includes('password_hash')) {
             const fallback = await supabase
                 .from('users')
                 .update({ password: password_hash })
-                .eq('email', email.toLowerCase());
+                .ilike('email', normalizedEmail);
             updateError = fallback.error;
         }
 
         if (updateError) throw updateError;
 
         // Cleanup OTP
-        await supabase.from('otps').delete().eq('email', email.toLowerCase());
+        await supabase.from('otps').delete().ilike('email', normalizedEmail);
 
         res.json({ message: 'Password reset successful! You can now login with your new password.' });
     } catch (err) {
@@ -811,38 +967,27 @@ app.post('/api/auth/reset-password', async (req, res) => {
 // Admin Login
 app.post('/api/admin/login', async (req, res) => {
     try {
-        const { admin_id, password } = req.body;
+        const admin_id = normalizeEmail(req.body?.admin_id);
+        const password = req.body?.password;
         if (!admin_id || !password) return res.status(400).json({ error: 'Admin ID and password required' });
 
-        const { data: admin, error } = await supabase
-            .from('admins')
-            .select('*')
-            .eq('admin_id', admin_id)
-            .single();
+        const { admin, error } = await findAdminByIdentifier(admin_id);
 
         if (error || !admin) return res.status(400).json({ error: 'Invalid Admin credentials' });
 
-        const adminStoredPrimary = typeof admin.password_hash === 'string' ? admin.password_hash : null;
-        const adminStoredLegacy = typeof admin.password === 'string' ? admin.password : null;
-
-        let match = false;
-        if (adminStoredPrimary) {
-            if (isBcryptHash(adminStoredPrimary)) {
-                match = await bcrypt.compare(password, adminStoredPrimary);
-            } else {
-                const { data: pgcryptRes } = await supabase.rpc('check_admin_pass', { a_id: admin_id, a_pass: password });
-                match = pgcryptRes;
-            }
-        } else if (adminStoredLegacy) {
-            match = await comparePasswordCompat(password, adminStoredLegacy);
-        } else {
+        const match = await verifyAdminPassword(admin, password);
+        if (match === null) {
             return res.status(400).json({ error: 'Admin account password is not configured correctly.' });
         }
 
         if (!match) return res.status(400).json({ error: 'Invalid Admin credentials' });
 
         const token = jwt.sign({ id: admin.id, role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
-        res.json({ message: 'Admin logged in', token });
+        res.json({
+            message: 'Admin logged in',
+            token,
+            user: { id: admin.id, name: 'System Admin', email: admin.admin_id, role: 'admin' }
+        });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Server error during admin login' });
@@ -1288,8 +1433,8 @@ app.post('/api/revert-login', verifyUserToken, async (req, res) => {
         if (isVercelRuntime) {
             return res.status(501).json({ error: 'Revert is disabled on Vercel runtime' });
         }
-        const backupPath = path.join(__dirname, '..', 'frontend', 'login.html.bak');
-        const targetPath = path.join(__dirname, '..', 'frontend', 'login.html');
+        const backupPath = path.join(frontendDir, 'login.html.bak');
+        const targetPath = path.join(frontendDir, 'login.html');
         if (!fs.existsSync(backupPath)) return res.status(404).json({ error: 'Backup not found' });
         const content = fs.readFileSync(backupPath, 'utf8');
         fs.writeFileSync(targetPath, content, 'utf8');
@@ -1302,19 +1447,26 @@ app.post('/api/revert-login', verifyUserToken, async (req, res) => {
 
 // Catch-all: serve frontend index for any non-API route
 app.get('{*path}', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'frontend', 'login.html'));
+    res.sendFile(path.join(frontendDir, 'login.html'));
 });
 
 function isSupabaseFatalInitError(message) {
     const msg = String(message || '').toLowerCase();
-    return msg.includes('permission denied')
+    const isSchemaOrAuthError = msg.includes('permission denied')
         || msg.includes('row-level security')
         || msg.includes('invalid api key')
         || msg.includes('invalid jwt')
         || msg.includes('jwt malformed')
         || msg.includes('relation')
-    || msg.includes('could not find the table')
+        || msg.includes('could not find the table')
         || msg.includes('does not exist');
+    const isOfflineLocalError = !isVercelRuntime && !process.env.RENDER && (
+        msg.includes('fetch failed')
+        || msg.includes('enotfound')
+        || msg.includes('econnrefused')
+        || msg.includes('etimedout')
+    );
+    return isSchemaOrAuthError || isOfflineLocalError;
 }
 
 async function initializeDataBackends() {
@@ -1325,7 +1477,7 @@ async function initializeDataBackends() {
             for (const table of requiredTables) {
                 const { error } = await cloud.from(table).select('*').limit(1);
                 if (error && isSupabaseFatalInitError(error.message)) {
-                    console.log(`ℹ️  Supabase schema is incomplete for local auth flow ('${table}'). Running in local JSON database mode.`);
+                    console.log(`ℹ️  Supabase unavailable/incomplete for '${table}' (${error.message}). Running in local JSON database mode.`);
                     supabase = createLocalSupabaseMock();
                     backendMode = 'local-json';
                     return;
@@ -1361,8 +1513,6 @@ async function ensureBackendReady(req, res, next) {
         res.status(500).json({ error: 'Backend initialization failed' });
     }
 }
-
-app.use('/api', ensureBackendReady);
 
 function startServer() {
     if (!initPromise) {
